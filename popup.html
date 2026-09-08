@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LINUX SB 扩展工具箱</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <header class="popup-header">
+        <div>
+          <div class="popup-title">🧰 LINUX SB 扩展工具箱</div>
+          <div class="popup-subtitle">称号抽取统计 · 当前功能</div>
+        </div>
+        <span class="local-badge">本地</span>
+      </header>
+
+      <section id="status" class="status" aria-live="polite">正在读取…</section>
+
+      <section class="metric-grid" aria-label="称号概况">
+        <div class="metric"><span>当前积分</span><strong id="points">—</strong></div>
+        <div class="metric"><span>收集进度</span><strong id="collection">—</strong></div>
+        <div class="metric"><span>累计抽取</span><strong id="pulls">—</strong></div>
+        <div class="metric"><span>累计投入</span><strong id="spend">—</strong></div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">预算保护</div>
+        <div class="setting-row">
+          <label for="reserve">最低保留积分</label>
+          <input id="reserve" type="number" min="0" step="1" value="0">
+        </div>
+        <div class="setting-row checkbox-row">
+          <label for="confirmEachDraw">每次抽取前确认</label>
+          <input id="confirmEachDraw" type="checkbox" checked>
+        </div>
+      </section>
+
+      <div class="button-row">
+        <button id="refresh" class="primary">刷新当前页</button>
+        <button id="sync">同步流水</button>
+      </div>
+      <div class="button-row">
+        <button id="openGacha">打开称号抽取</button>
+        <button id="openProfile">打开我的称号</button>
+      </div>
+      <div class="button-row">
+        <button id="openForge">打开熔炼助手</button>
+      </div>
+      <button id="openOptions" class="text-button">更多设置</button>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

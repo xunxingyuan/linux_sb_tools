@@ -1,0 +1,357 @@
+#linux-sb-title-assistant {
+  --lsa-bg: #ffffff;
+  --lsa-text: #1f2937;
+  --lsa-muted: #6b7280;
+  --lsa-line: #e5e7eb;
+  --lsa-brand: #2563eb;
+  --lsa-brand-soft: #eff6ff;
+  --lsa-danger: #b91c1c;
+  position: relative;
+  z-index: 5;
+  width: min(100%, 980px);
+  margin: 18px auto;
+  padding: 16px;
+  border: 1px solid var(--lsa-line);
+  border-radius: 16px;
+  background: var(--lsa-bg);
+  color: var(--lsa-text);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
+  font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+#linux-sb-title-assistant * {
+  box-sizing: border-box;
+}
+
+#linux-sb-title-assistant .lsa-header,
+#linux-sb-title-assistant .lsa-section-head,
+#linux-sb-title-assistant .lsa-actions,
+#linux-sb-title-assistant .lsa-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#linux-sb-title-assistant .lsa-header {
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+#linux-sb-title-assistant .lsa-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+#linux-sb-title-assistant .lsa-subtitle,
+#linux-sb-title-assistant .lsa-muted,
+#linux-sb-title-assistant .lsa-empty {
+  color: var(--lsa-muted);
+}
+
+#linux-sb-title-assistant .lsa-subtitle {
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+#linux-sb-title-assistant .lsa-header-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--lsa-brand-soft);
+  color: var(--lsa-brand);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#linux-sb-title-assistant .lsa-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+#linux-sb-title-assistant .lsa-metric {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+#linux-sb-title-assistant .lsa-metric-label {
+  color: var(--lsa-muted);
+  font-size: 11px;
+}
+
+#linux-sb-title-assistant .lsa-metric-value {
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#linux-sb-title-assistant .lsa-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--lsa-line);
+}
+
+#linux-sb-title-assistant .lsa-section-head {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+#linux-sb-title-assistant .lsa-score-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+#linux-sb-title-assistant .lsa-score-pill {
+  padding: 4px 9px;
+  border: 1px solid var(--lsa-line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+#linux-sb-title-assistant .lsa-band-chosen {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #a16207;
+}
+
+#linux-sb-title-assistant .lsa-band-emperor {
+  border-color: #fb923c;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+#linux-sb-title-assistant .lsa-band-lucky {
+  border-color: #34d399;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+#linux-sb-title-assistant .lsa-band-normal {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+#linux-sb-title-assistant .lsa-band-unlucky {
+  border-color: #fdba74;
+  background: #fff7ed;
+  color: #b45309;
+}
+
+#linux-sb-title-assistant .lsa-band-unlucky_extreme {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+#linux-sb-title-assistant .lsa-band-insufficient {
+  border-color: #d1d5db;
+  background: #f9fafb;
+  color: #6b7280;
+}
+
+#linux-sb-title-assistant .lsa-forge-options,
+#linux-sb-title-assistant .lsa-forge-targets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+#linux-sb-title-assistant .lsa-forge-exclusion-box {
+  margin-top: 12px;
+}
+
+#linux-sb-title-assistant #lsa-forge-exclusion-select {
+  display: block;
+  width: 100%;
+  min-height: 150px;
+  margin: 7px 0 6px;
+  padding: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--lsa-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+#linux-sb-title-assistant #lsa-forge-exclusion-select option {
+  padding: 4px 6px;
+}
+
+#linux-sb-title-assistant .lsa-forge-targets {
+  display: block;
+}
+
+#linux-sb-title-assistant .lsa-forge-target-title {
+  margin-bottom: 6px;
+}
+
+#linux-sb-title-assistant .lsa-forge-target-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+
+#linux-sb-title-assistant .lsa-forge-target-group label {
+  flex: 0 0 auto;
+  min-width: max-content;
+  white-space: nowrap;
+}
+
+#linux-sb-title-assistant .lsa-forge-options label,
+#linux-sb-title-assistant .lsa-forge-targets label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--lsa-text);
+  font-size: 12px;
+}
+
+#linux-sb-title-assistant .lsa-forge-options input,
+#linux-sb-title-assistant .lsa-forge-targets input {
+  margin: 0;
+}
+
+#linux-sb-title-assistant .lsa-forge-preview {
+  margin: 12px 0 10px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: #f8fafc;
+  color: var(--lsa-muted);
+  font-size: 12px;
+}
+
+#linux-sb-title-assistant .lsa-forge-expected {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--lsa-text);
+  font-weight: 600;
+}
+
+#linux-sb-title-assistant .lsa-forge-section > .lsa-primary {
+  width: 100%;
+}
+
+#linux-sb-title-assistant .lsa-section-title {
+  font-weight: 700;
+}
+
+#linux-sb-title-assistant .lsa-history-ssr {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--lsa-line);
+}
+
+#linux-sb-title-assistant .lsa-history-ssr-list {
+  margin-top: 7px;
+}
+
+#linux-sb-title-assistant .lsa-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#linux-sb-title-assistant .lsa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--lsa-line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+}
+
+#linux-sb-title-assistant .lsa-chip.missing {
+  border-color: #fecaca;
+  background: #fff7f7;
+  color: var(--lsa-danger);
+}
+
+#linux-sb-title-assistant button {
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+#linux-sb-title-assistant button:hover {
+  border-color: var(--lsa-brand);
+  color: var(--lsa-brand);
+}
+
+#linux-sb-title-assistant button:disabled {
+  border-color: #d1d5db;
+  background: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+#linux-sb-title-assistant .lsa-primary {
+  border-color: var(--lsa-brand);
+  background: var(--lsa-brand);
+  color: #fff;
+}
+
+#linux-sb-title-assistant .lsa-primary:hover {
+  color: #fff;
+}
+
+#linux-sb-title-assistant .lsa-notice {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+}
+
+#linux-sb-title-assistant .lsa-confirm {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #fbbf24;
+  border-radius: 10px;
+  background: #fffbeb;
+}
+
+#linux-sb-title-assistant .lsa-confirm-text {
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+#linux-sb-title-assistant .lsa-confirm-actions {
+  justify-content: flex-end;
+}
+
+#linux-sb-title-assistant .lsa-small-button {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  #linux-sb-title-assistant .lsa-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

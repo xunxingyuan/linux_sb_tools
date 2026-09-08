@@ -1,0 +1,114 @@
+#linux-sb-image-host {
+  --lsih-line: #e5e7eb;
+  --lsih-text: #1f2937;
+  --lsih-muted: #6b7280;
+  --lsih-brand: #2563eb;
+  display: block;
+  width: min(100%, 980px);
+  margin: 12px auto;
+  padding: 12px 14px;
+  border: 1px solid var(--lsih-line);
+  border-radius: 12px;
+  background: #f8fafc;
+  color: var(--lsih-text);
+  font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+#linux-sb-image-host * {
+  box-sizing: border-box;
+}
+
+#linux-sb-image-host .lsih-header,
+#linux-sb-image-host .lsih-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#linux-sb-image-host .lsih-header {
+  justify-content: space-between;
+}
+
+#linux-sb-image-host .lsih-title {
+  font-size: 14px;
+}
+
+#linux-sb-image-host .lsih-badge {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: var(--lsih-brand);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+#linux-sb-image-host .lsih-hint,
+#linux-sb-image-host .lsih-status {
+  margin-top: 5px;
+  color: var(--lsih-muted);
+  font-size: 12px;
+}
+
+#linux-sb-image-host .lsih-controls {
+  margin-top: 9px;
+}
+
+#linux-sb-image-host button {
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+#linux-sb-image-host button:hover {
+  border-color: var(--lsih-brand);
+  color: var(--lsih-brand);
+}
+
+#linux-sb-image-host .lsih-dropzone {
+  flex: 1;
+  padding: 6px 9px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 7px;
+  color: var(--lsih-muted);
+  cursor: pointer;
+  text-align: center;
+}
+
+#linux-sb-image-host .lsih-dropzone.is-dragging {
+  border-color: var(--lsih-brand);
+  background: #eff6ff;
+  color: var(--lsih-brand);
+}
+
+#linux-sb-image-host .lsih-status.is-error {
+  color: #b91c1c;
+}
+
+#linux-sb-image-host .lsih-queue {
+  max-height: 120px;
+  margin: 6px 0 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  color: var(--lsih-muted);
+  font-size: 12px;
+}
+
+#linux-sb-image-host .lsih-queue-item {
+  padding: 2px 0;
+}
+
+#linux-sb-image-host .lsih-queue-item.is-error {
+  color: #b91c1c;
+}
+
+@media (max-width: 600px) {
+  #linux-sb-image-host .lsih-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

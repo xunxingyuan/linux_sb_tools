@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "LINUX SB 扩展工具箱",
+  "version": "0.7.2",
+  "description": "LINUX SB 扩展工具箱，当前提供个人称号抽取统计与本地辅助功能。",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://linux.sb/*",
+    "https://*.r2.cloudflarestorage.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "LINUX SB 扩展工具箱",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://linux.sb/gacha"],
+      "js": ["lib/parser.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://linux.sb/gacha_forge_center"],
+      "js": ["lib/parser.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://linux.sb/topic_edit"],
+      "js": ["image-host.js"],
+      "css": ["image-host.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -4,6 +4,14 @@
   const STORAGE_KEY = 'linuxSbTitleAssistantState';
   const DEFAULT_SETTINGS = { reservePoints: 0, confirmEachDraw: true };
 
+  function emptyState() {
+    return {
+      current: {},
+      historyRows: [],
+      settings: { ...DEFAULT_SETTINGS }
+    };
+  }
+
   const $ = (id) => document.getElementById(id);
 
   function formatNumber(value) {
@@ -50,7 +58,14 @@
 
   async function getState() {
     const data = await chrome.storage.local.get(STORAGE_KEY);
-    return data[STORAGE_KEY] || { current: {}, historyRows: [], settings: DEFAULT_SETTINGS };
+    const saved = data[STORAGE_KEY] || {};
+    return {
+      ...emptyState(),
+      ...saved,
+      current: { ...emptyState().current, ...(saved.current || {}) },
+      historyRows: Array.isArray(saved.historyRows) ? saved.historyRows : [],
+      settings: { ...DEFAULT_SETTINGS, ...(saved.settings || {}) }
+    };
   }
 
   async function saveSettings() {
@@ -96,8 +111,7 @@
     window.close();
   }
 
-  (async function init() {
-    render(await getState());
+  function bindEvents() {
     $('reserve').addEventListener('change', saveSettings);
     $('confirmEachDraw').addEventListener('change', saveSettings);
     $('refresh').addEventListener('click', () => refresh('REFRESH', '刷新页面数据'));
@@ -106,5 +120,15 @@
     $('openProfile').addEventListener('click', () => openPage('/gacha_profile'));
     $('openForge').addEventListener('click', () => openPage('/gacha_forge_center'));
     $('openOptions').addEventListener('click', () => chrome.runtime.openOptionsPage());
+  }
+
+  (async function init() {
+    bindEvents();
+    render(emptyState());
+    try {
+      render(await getState());
+    } catch (error) {
+      setStatus(error.message || '本地统计尚未初始化', true);
+    }
   })().catch((error) => setStatus(error.message || '读取失败', true));
 })();

@@ -27,6 +27,22 @@ test('summarizes draw, recycle, sale and purchase history', () => {
   assert.equal(summary.lastTime, '2026-09-08T10:00:00+08:00');
 });
 
+test('keeps draw counts and point costs aligned by draw mode', () => {
+  const rows = [
+    ...Array.from({ length: 38 }, () => ({ kind: 'draw', mode: 'hundred', pulls: 100, change: -800 })),
+    ...Array.from({ length: 18 }, () => ({ kind: 'draw', mode: 'ten', pulls: 10, change: -90 })),
+    { kind: 'draw', mode: 'single', pulls: 1, change: -10 }
+  ];
+  const summary = parser.summarizeHistory(rows);
+  assert.equal(summary.totalPulls, 3981);
+  assert.equal(summary.totalSpend, 32030);
+  assert.deepEqual(summary.byMode, {
+    single: { batches: 1, pulls: 1, cost: 10 },
+    ten: { batches: 18, pulls: 180, cost: 1620 },
+    hundred: { batches: 38, pulls: 3800, cost: 30400 }
+  });
+});
+
 test('plans discounted pulls while preserving the requested reserve', () => {
   const plan = parser.planDraws(903, 0);
   assert.deepEqual(plan.plan.map((item) => [item.mode, item.count]), [['single', 1], ['ten', 1], ['hundred', 1]]);

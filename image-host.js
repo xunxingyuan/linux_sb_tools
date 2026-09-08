@@ -7,6 +7,14 @@
 
   const CONFIG_KEY = 'linuxSbImageHostConfig';
   const MAX_IMAGE_BYTES = 32 * 1024 * 1024;
+  const DEFAULT_IMAGE_SETTINGS = {
+    enabled: false,
+    provider: 'cloudflare-r2',
+    compressionEnabled: true,
+    compressionQuality: 0.84,
+    maxDimension: 2560
+  };
+  const COMPRESSIBLE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
   let host = null;
   let textarea = null;
   let fileInput = null;
@@ -15,8 +23,12 @@
   let removePageListeners = () => {};
 
   async function loadConfig() {
-    const stored = await chrome.storage.local.get(CONFIG_KEY);
-    return { enabled: false, provider: 'cloudflare-r2', ...(stored[CONFIG_KEY] || {}) };
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'GET_IMAGE_HOST_SETTINGS' });
+      return { ...DEFAULT_IMAGE_SETTINGS, ...((response && response.ok && response.settings) || {}) };
+    } catch (_error) {
+      return { ...DEFAULT_IMAGE_SETTINGS };
+    }
   }
 
   function element(tag, className, text) {
@@ -30,6 +42,114 @@
     if (!status) return;
     status.textContent = message;
     status.classList.toggle('is-error', Boolean(isError));
+  }
+
+  function formatBytes(value) {
+    const bytes = Math.max(0, Number(value) || 0);
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function normalizedQuality(value) {
+    const quality = Number(value);
+    return Number.isFinite(quality) ? Math.min(0.95, Math.max(0.5, quality)) : 0.84;
+  }
+
+  function normalizedMaxDimension(value) {
+    const maxDimension = Number(value);
+    return Number.isFinite(maxDimension)
+      ? Math.round(Math.min(8192, Math.max(512, maxDimension)))
+      : 2560;
+  }
+
+  async function decodeImage(file) {
+    if (typeof createImageBitmap === 'function') {
+      try {
+        let bitmap;
+        try {
+          bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+        } catch (_error) {
+          bitmap = await createImageBitmap(file);
+        }
+        return {
+          source: bitmap,
+          width: bitmap.width,
+          height: bitmap.height,
+          release: () => bitmap.close()
+        };
+      } catch (_error) {
+        // Fall back to an object URL when ImageBitmap cannot decode this file.
+      }
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error('图片解码失败'));
+        element.src = objectUrl;
+      });
+      return {
+        source: image,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+        release: () => URL.revokeObjectURL(objectUrl)
+      };
+    } catch (error) {
+      URL.revokeObjectURL(objectUrl);
+      throw error;
+    }
+  }
+
+  async function prepareUpload(file, settings) {
+    const original = {
+      blob: file,
+      name: file.name || 'image',
+      type: file.type || 'application/octet-stream',
+      originalSize: file.size,
+      uploadSize: file.size,
+      compressed: false
+    };
+    if (!settings.compressionEnabled || !COMPRESSIBLE_IMAGE_TYPES.has(file.type) || !file.size) return original;
+
+    let decoded = null;
+    try {
+      decoded = await decodeImage(file);
+      const maxDimension = normalizedMaxDimension(settings.maxDimension);
+      const longestSide = Math.max(decoded.width, decoded.height);
+      const scale = Math.min(1, maxDimension / longestSide);
+      const width = Math.max(1, Math.round(decoded.width * scale));
+      const height = Math.max(1, Math.round(decoded.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      if (!context) return original;
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
+      context.drawImage(decoded.source, 0, 0, width, height);
+      const compressed = await new Promise((resolve) => {
+        canvas.toBlob(resolve, 'image/webp', normalizedQuality(settings.compressionQuality));
+      });
+      if (!compressed || compressed.size >= file.size) return original;
+
+      const sourceName = String(file.name || 'image');
+      const stem = sourceName.replace(/\.[^/.]+$/, '') || 'image';
+      return {
+        ...original,
+        blob: compressed,
+        name: `${stem}.webp`,
+        type: 'image/webp',
+        uploadSize: compressed.size,
+        compressed: true
+      };
+    } catch (_error) {
+      return original;
+    } finally {
+      if (decoded) decoded.release();
+    }
   }
 
   function insertMarkdown(markdown) {
@@ -61,35 +181,45 @@
     return item;
   }
 
-  async function uploadFile(file, item) {
-    if (!file.type.startsWith('image/')) throw new Error(`${file.name} 不是图片文件`);
+  async function uploadFile(file, item, settings) {
+    const fileType = String(file.type || '');
+    if (!fileType.startsWith('image/')) throw new Error(`${file.name} 不是图片文件`);
     if (file.size > MAX_IMAGE_BYTES) throw new Error(`${file.name} 超过 32 MB`);
-    item.textContent = `${file.name} · 上传中…`;
+    item.textContent = `${file.name} · ${formatBytes(file.size)} · 处理中…`;
+    const prepared = await prepareUpload(file, settings);
+    const sizeSummary = prepared.compressed
+      ? `${formatBytes(prepared.originalSize)} → ${formatBytes(prepared.uploadSize)}`
+      : `${formatBytes(prepared.uploadSize)} · 原图`;
+    item.textContent = `${file.name} · ${sizeSummary} · 上传中…`;
     const response = await chrome.runtime.sendMessage({
       type: 'UPLOAD_IMAGE',
-      file: { name: file.name, type: file.type, base64: encodeBase64(await file.arrayBuffer()) }
+      file: { name: prepared.name, type: prepared.type, base64: encodeBase64(await prepared.blob.arrayBuffer()) }
     });
     if (!response || !response.ok || !response.url) throw new Error(response?.error || `${file.name} 上传失败`);
     const alt = file.name.replace(/[\[\]\\]/g, '').replace(/\s+/g, ' ').trim() || '图片';
     insertMarkdown(`![${alt}](${response.url})`);
-    item.textContent = `${file.name} · 已插入正文`;
+    item.textContent = `${file.name} · ${sizeSummary} · 已插入正文`;
+    return prepared.compressed;
   }
 
   async function handleFiles(files) {
     const list = Array.from(files || []).filter(Boolean);
     if (!list.length) return;
+    const settings = await loadConfig();
     let success = 0;
+    let compressed = 0;
     for (const file of list) {
       const item = makeQueueItem(file);
       try {
-        await uploadFile(file, item);
+        if (await uploadFile(file, item, settings)) compressed += 1;
         success += 1;
       } catch (error) {
         item.textContent = `${file.name} · ${error.message || '上传失败'}`;
         item.classList.add('is-error');
       }
     }
-    setStatus(success === list.length ? `已上传 ${success} 张图片并插入正文。` : `完成 ${success}/${list.length} 张图片，失败项请重试。`, success !== list.length);
+    const compressionNote = compressed ? `，压缩 ${compressed} 张` : '';
+    setStatus(success === list.length ? `已上传 ${success} 张图片并插入正文${compressionNote}。` : `完成 ${success}/${list.length} 张图片${compressionNote}，失败项请重试。`, success !== list.length);
   }
 
   function unmount() {

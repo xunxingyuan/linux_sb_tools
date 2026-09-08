@@ -111,11 +111,13 @@
     head.append(element('div', 'lsa-muted', `${state.historyRows.length} 条称号流水`));
     section.append(head);
 
-    const metrics = element('div', 'lsa-metrics');
+    const metrics = element('div', 'lsa-metrics lsa-history-metrics');
     metrics.append(
       createMetric('累计抽取', `${formatNumber(summary.totalPulls)} 次`),
       createMetric('累计投入', `${formatNumber(summary.totalSpend)} 分`),
       createMetric('回收所得', `${formatNumber(summary.recyclePoints)} 分`),
+      createMetric('出售所得', `${formatNumber(summary.sellPoints)} 分`),
+      createMetric('购买支出', `${formatNumber(summary.purchasePoints)} 分`),
       createMetric('抽取净额', `${formatNumber(summary.netGachaPoints)} 分`)
     );
     section.append(metrics);

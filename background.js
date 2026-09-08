@@ -58,7 +58,22 @@
       secretAccessKey: '',
       publicBaseUrl: '',
       objectPrefix: 'linux-sb',
+      compressionEnabled: true,
+      compressionQuality: 0.84,
+      maxDimension: 2560,
       ...(stored[CONFIG_KEY] || {})
+    };
+  }
+
+  function imageHostSettings(config) {
+    const quality = Number(config.compressionQuality);
+    const maxDimension = Number(config.maxDimension);
+    return {
+      enabled: config.enabled === true,
+      provider: config.provider || 'cloudflare-r2',
+      compressionEnabled: config.compressionEnabled !== false,
+      compressionQuality: Number.isFinite(quality) ? Math.min(0.95, Math.max(0.5, quality)) : 0.84,
+      maxDimension: Number.isFinite(maxDimension) ? Math.round(Math.min(8192, Math.max(512, maxDimension))) : 2560
     };
   }
 
@@ -150,7 +165,14 @@
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (!message || message.type !== 'UPLOAD_IMAGE') return undefined;
+    if (!message) return undefined;
+    if (message.type === 'GET_IMAGE_HOST_SETTINGS') {
+      loadConfig()
+        .then((config) => sendResponse({ ok: true, settings: imageHostSettings(config) }))
+        .catch((error) => sendResponse({ ok: false, error: error.message || '读取图床设置失败' }));
+      return true;
+    }
+    if (message.type !== 'UPLOAD_IMAGE') return undefined;
     uploadR2Image(message.file)
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((error) => sendResponse({ ok: false, error: error.message || '上传失败' }));

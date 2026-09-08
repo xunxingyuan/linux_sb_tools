@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "LINUX SB 扩展工具箱",
-  "version": "0.7.2",
-  "description": "LINUX SB 扩展工具箱，当前提供个人称号抽取统计与本地辅助功能。",
+  "version": "0.8.0",
+  "description": "LINUX SB 扩展工具箱，提供称号抽取统计、熔铸助手和本地图片压缩上传。",
   "permissions": [
     "storage",
     "activeTab"

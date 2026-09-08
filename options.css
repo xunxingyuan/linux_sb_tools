@@ -200,3 +200,33 @@ button.primary:hover {
   color: #92400e;
   font-size: 12px;
 }
+
+.image-compression-settings {
+  margin: 20px 0 18px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.compression-title {
+  margin-bottom: 12px;
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.image-compression-settings .check-field {
+  margin-bottom: 16px;
+}
+
+.compact-field {
+  margin-bottom: 12px;
+}
+
+.compact-field:last-child {
+  margin-bottom: 0;
+}
+
+.compact-field input[type="number"] {
+  width: 180px;
+}

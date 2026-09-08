@@ -31,7 +31,7 @@
         <div class="card-heading">
           <div>
             <h2>图床助手</h2>
-            <p>默认关闭；开启后只在发帖页出现。</p>
+            <p>默认关闭；开启后只在发帖或回帖页出现。</p>
           </div>
           <span class="default-badge">默认关闭</span>
         </div>
@@ -74,8 +74,28 @@
             <span>对象前缀（可选）</span>
             <input id="cloudflareObjectPrefix" type="text" autocomplete="off" spellcheck="false" value="linux-sb" placeholder="linux-sb">
           </label>
+          <div class="image-compression-settings">
+            <div class="compression-title">上传优化</div>
+            <label class="check-field image-toggle-field">
+              <input id="imageCompressionEnabled" type="checkbox" checked>
+              <span>上传前压缩图片（推荐）</span>
+            </label>
+            <label class="field compact-field">
+              <span>压缩质量</span>
+              <select id="imageCompressionQuality">
+                <option value="0.8">80% · 更省空间</option>
+                <option value="0.84" selected>84% · 推荐</option>
+                <option value="0.9">90% · 更清晰</option>
+              </select>
+            </label>
+            <label class="field compact-field">
+              <span>最长边上限</span>
+              <input id="imageMaxDimension" type="number" min="512" max="8192" step="1" value="2560">
+              <small>JPG、PNG、WebP 会转换为 WebP；GIF 动图和 SVG 保留原格式。</small>
+            </label>
+          </div>
           <div class="image-host-note">
-            图片会以公开链接形式访问。Access Key 和 Secret Access Key 属于敏感凭据，只保存在本地扩展设置中；不要在聊天中发送，也不要上传隐私图片。
+            图片会以公开链接形式访问。压缩在浏览器本地完成，只有压缩后的图片才会上传；如果压缩结果反而变大，则自动保留原图。Access Key 和 Secret Access Key 属于敏感凭据，只保存在本地扩展设置中；不要在聊天中发送，也不要上传隐私图片。
           </div>
           <div class="button-row">
             <button class="primary" type="submit">保存图床设置</button>

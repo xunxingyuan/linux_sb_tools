@@ -27,7 +27,15 @@
   const cloudflareSecretAccessKey = document.getElementById('cloudflareSecretAccessKey');
   const cloudflarePublicBaseUrl = document.getElementById('cloudflarePublicBaseUrl');
   const cloudflareObjectPrefix = document.getElementById('cloudflareObjectPrefix');
+  const imageCompressionEnabled = document.getElementById('imageCompressionEnabled');
+  const imageCompressionQuality = document.getElementById('imageCompressionQuality');
+  const imageMaxDimension = document.getElementById('imageMaxDimension');
   const imageHostMessage = document.getElementById('imageHostMessage');
+
+  function clamp(value, min, max, fallback) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
+  }
 
   function mergedState(saved) {
     return {
@@ -58,6 +66,9 @@
       secretAccessKey: '',
       publicBaseUrl: '',
       objectPrefix: 'linux-sb',
+      compressionEnabled: true,
+      compressionQuality: 0.84,
+      maxDimension: 2560,
       ...(value[IMAGE_CONFIG_KEY] || {})
     };
   }
@@ -76,7 +87,10 @@
       accessKeyId: cloudflareAccessKeyId.value.trim(),
       secretAccessKey: cloudflareSecretAccessKey.value.trim() || currentConfig.secretAccessKey || '',
       publicBaseUrl: cloudflarePublicBaseUrl.value.trim(),
-      objectPrefix: cloudflareObjectPrefix.value.trim() || 'linux-sb'
+      objectPrefix: cloudflareObjectPrefix.value.trim() || 'linux-sb',
+      compressionEnabled: imageCompressionEnabled.checked,
+      compressionQuality: clamp(imageCompressionQuality.value, 0.5, 0.95, 0.84),
+      maxDimension: Math.round(clamp(imageMaxDimension.value, 512, 8192, 2560))
     };
   }
 
@@ -123,6 +137,9 @@
     cloudflareSecretAccessKey.value = '';
     cloudflarePublicBaseUrl.value = '';
     cloudflareObjectPrefix.value = 'linux-sb';
+    imageCompressionEnabled.checked = true;
+    imageCompressionQuality.value = '0.84';
+    imageMaxDimension.value = '2560';
     await writeImageConfig({
       enabled: false,
       provider: 'cloudflare-r2',
@@ -131,7 +148,10 @@
       accessKeyId: '',
       secretAccessKey: '',
       publicBaseUrl: '',
-      objectPrefix: 'linux-sb'
+      objectPrefix: 'linux-sb',
+      compressionEnabled: true,
+      compressionQuality: 0.84,
+      maxDimension: 2560
     });
     imageHostMessage.textContent = 'Cloudflare R2 凭据已清除，图床助手已关闭。';
   });
@@ -147,6 +167,9 @@
     cloudflareSecretAccessKey.value = imageConfig.secretAccessKey || '';
     cloudflarePublicBaseUrl.value = imageConfig.publicBaseUrl || '';
     cloudflareObjectPrefix.value = imageConfig.objectPrefix || 'linux-sb';
+    imageCompressionEnabled.checked = imageConfig.compressionEnabled !== false;
+    imageCompressionQuality.value = String(clamp(imageConfig.compressionQuality, 0.5, 0.95, 0.84));
+    imageMaxDimension.value = String(Math.round(clamp(imageConfig.maxDimension, 512, 8192, 2560)));
   }).catch(() => {
     message.textContent = '读取设置失败。';
   });

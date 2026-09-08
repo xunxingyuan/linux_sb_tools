@@ -69,6 +69,10 @@
   margin-bottom: 14px;
 }
 
+#linux-sb-title-assistant .lsa-history-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 #linux-sb-title-assistant .lsa-metric {
   min-width: 0;
   padding: 10px;

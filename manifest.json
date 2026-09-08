@@ -33,7 +33,7 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://linux.sb/topic_edit"],
+      "matches": ["https://linux.sb/topic_edit", "https://linux.sb/topic/*"],
       "js": ["image-host.js"],
       "css": ["image-host.css"],
       "run_at": "document_idle"

@@ -82,7 +82,7 @@
     } catch (error) {
       const message = error && error.message ? error.message : '';
       const friendly = /Receiving end does not exist|Could not establish connection|没有找到当前页面/.test(message)
-        ? '当前页面不注入工具箱模块，请打开称号抽取或称号熔炼页面。'
+        ? '当前页面不注入统计模块；图床助手仅在发帖或回帖页、且启用后显示。'
         : (message || `${label}失败`);
       setStatus(friendly, true);
     } finally {

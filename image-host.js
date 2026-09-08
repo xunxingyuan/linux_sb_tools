@@ -1,7 +1,9 @@
 (function () {
   'use strict';
 
-  if (location.hostname !== 'linux.sb' || location.pathname !== '/topic_edit') return;
+  const isTopicEdit = location.pathname === '/topic_edit';
+  const isTopicPage = location.pathname.startsWith('/topic/');
+  if (location.hostname !== 'linux.sb' || (!isTopicEdit && !isTopicPage)) return;
 
   const CONFIG_KEY = 'linuxSbImageHostConfig';
   const MAX_IMAGE_BYTES = 32 * 1024 * 1024;
@@ -103,7 +105,10 @@
 
   function mount() {
     if (host) return;
-    textarea = document.querySelector('textarea[name="body"]');
+    const editorSelector = isTopicPage
+      ? 'form[action="/reply_edit"] textarea[name="body"]'
+      : 'textarea[name="body"]';
+    textarea = document.querySelector(editorSelector);
     if (!textarea) return;
 
     host = element('section', 'lsih-panel');

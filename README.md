@@ -2,7 +2,7 @@
 
 这是一个 Chrome Manifest V3 扩展工具箱，用于增强 `https://linux.sb/` 的个人称号抽取和称号熔炼页面。
 
-称号模块只匹配 `/gacha` 和 `/gacha_forge_center`；图床模块只匹配 `/topic_edit`，且默认关闭。论坛首页、个人主页、积分页及其他页面不会默认注入。
+称号模块只匹配 `/gacha` 和 `/gacha_forge_center`；图床模块只匹配新建主题 `/topic_edit` 和帖子详情页 `/topic/*`，且默认关闭。论坛首页、个人主页、积分页及其他页面不会默认注入。
 
 当前 MVP：
 
@@ -12,7 +12,7 @@
 - 普通抽取只统计次数和积分流水；有完整通知的 SSR 熔炼结果使用天选之子、欧气成精、锦鲤转世、随机路人、保底受害者、非酋降临六级评价。
 - 解析个人通知中的 N×3→R、R×3→SR、SR×8→SSR 熔炼结果，统计 SSR 内部称号分布。
 - 在称号熔炼页提供一键熔铸：默认排除 N「路人甲」，可选择每种称号保留 1 个，并选择熔铸到 SR 或继续到 SSR。
-- 提供默认关闭的 Cloudflare R2 图床助手：在发帖页选择、拖拽或粘贴图片后，自动上传并插入 Markdown 图片链接。
+- 提供默认关闭的 Cloudflare R2 图床助手：在发帖或回帖页选择、拖拽或粘贴图片后，自动上传并插入 Markdown 图片链接。
 - 提供最低余额保护和单次抽取确认。
 
 ## 功能截图
@@ -37,7 +37,7 @@
 
 ![Cloudflare R2 图床配置](docs/screenshots/r2-settings.png)
 
-图床默认关闭。启用后，在 `https://linux.sb/topic_edit` 的正文框中选择、拖拽或粘贴图片，即可上传到已绑定公开域名的 R2 Bucket，并在当前光标处插入 Markdown 图片链接。
+图床默认关闭。启用后，在 `https://linux.sb/topic_edit` 或 `https://linux.sb/topic/*` 的正文框中选择、拖拽或粘贴图片，即可上传到已绑定公开域名的 R2 Bucket，并在当前光标处插入 Markdown 图片链接。
 
 统计数据和图床配置使用 `chrome.storage.local` 保存在本地，不上传账号信息，也不读取或保存密码、CSRF 值。图床助手只有在用户主动启用后才会把用户选择的图片发送到 Cloudflare R2；公开图床不适合上传隐私图片。
 

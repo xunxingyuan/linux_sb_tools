@@ -29,6 +29,10 @@
 
 熔铸助手按 N→R→SR→SSR 的顺序分阶段执行，支持多选排除项、每种称号保留一个，以及仅熔铸到 SR 或继续到 SSR。
 
+![熔铸预期结果](docs/screenshots/forge-preview.png)
+
+预览会明确显示各稀有度的预计消耗数量和生成结果。
+
 ### Cloudflare R2 图床配置
 
 ![Cloudflare R2 图床配置](docs/screenshots/r2-settings.png)

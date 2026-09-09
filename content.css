@@ -176,22 +176,49 @@
   margin-top: 12px;
 }
 
-#linux-sb-title-assistant #lsa-forge-exclusion-select {
-  display: block;
-  width: 100%;
-  min-height: 150px;
+#linux-sb-title-assistant .lsa-forge-exclusion-options {
+  display: grid;
+  gap: 8px;
   margin: 7px 0 6px;
-  padding: 6px;
+  padding: 10px;
   border: 1px solid #d1d5db;
   border-radius: 9px;
   background: #fff;
-  color: var(--lsa-text);
-  font: inherit;
-  font-size: 13px;
 }
 
-#linux-sb-title-assistant #lsa-forge-exclusion-select option {
-  padding: 4px 6px;
+#linux-sb-title-assistant .lsa-forge-exclusion-group {
+  display: grid;
+  gap: 5px;
+}
+
+#linux-sb-title-assistant .lsa-forge-exclusion-rarity {
+  color: var(--lsa-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#linux-sb-title-assistant .lsa-forge-exclusion-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#linux-sb-title-assistant .lsa-forge-exclusion-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: var(--lsa-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#linux-sb-title-assistant .lsa-forge-exclusion-item input {
+  margin: 0;
+  accent-color: var(--lsa-brand);
 }
 
 #linux-sb-title-assistant .lsa-forge-targets {

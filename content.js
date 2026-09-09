@@ -5,6 +5,7 @@
   if (!parser || location.hostname !== 'linux.sb') return;
 
   const STORAGE_KEY = 'linuxSbTitleAssistantState';
+  const DEFAULT_FORGE_EXCLUSIONS = ['路人甲', '反贼'];
   const DEFAULT_STATE = {
     version: 1,
     updatedAt: '',
@@ -22,7 +23,7 @@
     settings: {
       reservePoints: 0,
       confirmEachDraw: true,
-      forgeExcludedNames: ['路人甲'],
+      forgeExcludedNames: [...DEFAULT_FORGE_EXCLUSIONS],
       forgeKeepOne: true,
       forgeTarget: 'SR',
       adRemovalEnabled: false
@@ -48,7 +49,12 @@
     const next = cloneDefaultState();
     Object.assign(next, saved);
     next.current = { ...DEFAULT_STATE.current, ...(saved.current || {}) };
-    next.settings = { ...DEFAULT_STATE.settings, ...(saved.settings || {}) };
+    const savedSettings = saved.settings || {};
+    next.settings = { ...DEFAULT_STATE.settings, ...savedSettings };
+    if (!Array.isArray(savedSettings.forgeExcludedNames)
+      || (savedSettings.forgeExcludedNames.length === 1 && savedSettings.forgeExcludedNames[0] === '路人甲')) {
+      next.settings.forgeExcludedNames = [...DEFAULT_FORGE_EXCLUSIONS];
+    }
     next.historyRows = Array.isArray(saved.historyRows) ? saved.historyRows : [];
     next.forgeEvents = Array.isArray(saved.forgeEvents) ? saved.forgeEvents : [];
     return next;
@@ -320,7 +326,7 @@
       await chrome.storage.local.set({
         pendingForgeChain: {
           targetRarity,
-          excludeRoad: settings.excludeRoad,
+          excludedNames: Array.from(settings.excludedNames || []),
           keepOne: settings.keepOne,
           stageIndex: 0,
           startedAt: new Date().toISOString()
@@ -347,7 +353,7 @@
     const lastStage = chain.targetRarity === 'SSR' ? 2 : 1;
     let stageIndex = Math.max(0, Number(chain.stageIndex) || 0);
     const settings = {
-      excludedNames: Array.isArray(chain.excludedNames) ? chain.excludedNames : ['路人甲'],
+      excludedNames: Array.isArray(chain.excludedNames) ? chain.excludedNames : [...DEFAULT_FORGE_EXCLUSIONS],
       keepOne: chain.keepOne !== false
     };
     while (stageIndex <= lastStage) {
@@ -400,30 +406,35 @@
 
     const exclusionBox = element('div', 'lsa-forge-exclusion-box');
     exclusionBox.append(element('div', 'lsa-muted', '排除称号（可多选）'));
-    const exclusionSelect = document.createElement('select');
-    exclusionSelect.id = 'lsa-forge-exclusion-select';
-    exclusionSelect.multiple = true;
-    exclusionSelect.setAttribute('aria-label', '选择要排除的称号');
     const selectableTitles = (state.current.titles || []).filter((item) => ['SR', 'R', 'N'].includes(item.rarity));
     const selectableNames = new Set(selectableTitles.map((item) => item.name));
     const savedExcluded = Array.isArray(state.settings.forgeExcludedNames)
       ? state.settings.forgeExcludedNames
-      : ['路人甲'];
+      : DEFAULT_FORGE_EXCLUSIONS;
     const excludedNames = new Set(savedExcluded.filter((name) => selectableNames.has(name)));
+    const exclusionInputs = [];
+    const exclusionOptions = element('div', 'lsa-forge-exclusion-options');
     ['SR', 'R', 'N'].forEach((rarity) => {
-      const group = document.createElement('optgroup');
-      group.label = rarity;
-      selectableTitles.filter((item) => item.rarity === rarity).forEach((item) => {
-        const option = document.createElement('option');
-        option.value = item.name;
-        option.textContent = `${item.icon ? `${item.icon} ` : ''}${item.name}`;
-        option.selected = excludedNames.has(item.name);
-        group.append(option);
+      const titles = selectableTitles.filter((item) => item.rarity === rarity);
+      if (!titles.length) return;
+      const group = element('div', 'lsa-forge-exclusion-group');
+      group.append(element('div', 'lsa-forge-exclusion-rarity', rarity));
+      const items = element('div', 'lsa-forge-exclusion-items');
+      titles.forEach((item) => {
+        const label = document.createElement('label');
+        label.className = 'lsa-forge-exclusion-item';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = item.name;
+        checkbox.checked = excludedNames.has(item.name);
+        label.append(checkbox, element('span', '', `${item.icon ? `${item.icon} ` : ''}${item.name}`));
+        items.append(label);
+        exclusionInputs.push(checkbox);
       });
-      if (group.children.length) exclusionSelect.append(group);
+      group.append(items);
+      exclusionOptions.append(group);
     });
-    exclusionSelect.size = Math.min(9, Math.max(4, selectableNames.size));
-    exclusionBox.append(exclusionSelect, element('div', 'lsa-muted', '按住 Command/Ctrl 可同时选择多个称号'));
+    exclusionBox.append(exclusionOptions, element('div', 'lsa-muted', '勾选的称号不会作为熔铸材料；仅显示 SR、R、N 称号'));
 
     const targetOptions = element('div', 'lsa-forge-targets');
     const targetTitle = element('div', 'lsa-muted lsa-forge-target-title', '熔铸目标');
@@ -457,13 +468,14 @@
 
     const syncExcludedNames = () => {
       excludedNames.clear();
-      Array.from(exclusionSelect.selectedOptions).forEach((option) => excludedNames.add(option.value));
+      exclusionInputs.filter((input) => input.checked).forEach((input) => excludedNames.add(input.value));
     };
-    exclusionSelect.addEventListener('change', () => {
+    const handleExclusionChange = () => {
       syncExcludedNames();
       persistForgeSettings();
       updatePreview();
-    });
+    };
+    exclusionInputs.forEach((input) => input.addEventListener('change', handleExclusionChange));
     keep.addEventListener('change', () => {
       persistForgeSettings();
       updatePreview();

@@ -10,13 +10,14 @@
     current: { points: null, pool: [], titles: [], inventory: [], ownedTypes: null, totalTypes: null },
     historyRows: [],
     forgeEvents: [],
-    settings: { reservePoints: 0, confirmEachDraw: true },
+    settings: { reservePoints: 0, confirmEachDraw: true, adRemovalEnabled: false },
     pendingDraw: null
   };
 
   const form = document.getElementById('settingsForm');
   const reserve = document.getElementById('reservePoints');
   const confirmEachDraw = document.getElementById('confirmEachDraw');
+  const adRemovalEnabled = document.getElementById('adRemovalEnabled');
   const message = document.getElementById('message');
   const imageHostForm = document.getElementById('imageHostForm');
   const imageHostEnabled = document.getElementById('imageHostEnabled');
@@ -100,7 +101,8 @@
     state.settings = {
       ...state.settings,
       reservePoints: Math.max(0, Number(reserve.value) || 0),
-      confirmEachDraw: confirmEachDraw.checked
+      confirmEachDraw: confirmEachDraw.checked,
+      adRemovalEnabled: adRemovalEnabled.checked
     };
     await writeState(state);
     message.textContent = '设置已保存。';
@@ -159,6 +161,7 @@
   Promise.all([readState(), readImageConfig()]).then(([state, imageConfig]) => {
     reserve.value = String(state.settings.reservePoints || 0);
     confirmEachDraw.checked = state.settings.confirmEachDraw !== false;
+    adRemovalEnabled.checked = state.settings.adRemovalEnabled === true;
     imageHostEnabled.checked = imageConfig.enabled === true;
     imageProvider.value = 'cloudflare-r2';
     cloudflareAccountId.value = imageConfig.accountId || '';

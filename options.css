@@ -93,6 +93,14 @@ h2 {
   margin: 0;
 }
 
+.setting-help {
+  display: block;
+  margin: -12px 0 24px;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .button-row {
   display: flex;
   gap: 10px;

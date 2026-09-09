@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "LINUX SB 扩展工具箱",
-  "version": "0.8.1",
-  "description": "LINUX SB 扩展工具箱，提供称号抽取统计、熔铸助手和本地图片压缩上传。",
+  "version": "0.9.0",
+  "description": "LINUX SB 扩展工具箱，提供称号抽取统计、熔铸助手、图片压缩上传和可选去广告。",
   "permissions": [
     "storage",
     "activeTab"
@@ -36,6 +36,12 @@
       "matches": ["https://linux.sb/topic_edit", "https://linux.sb/topic/*"],
       "js": ["image-host.js"],
       "css": ["image-host.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://linux.sb/*"],
+      "js": ["ad-remover.js"],
+      "css": ["ad-remover.css"],
       "run_at": "document_idle"
     }
   ]

@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linuxSbTitleAssistantState';
-  const DEFAULT_SETTINGS = { reservePoints: 0, confirmEachDraw: true };
+  const DEFAULT_SETTINGS = { reservePoints: 0, confirmEachDraw: true, adRemovalEnabled: false };
 
   function emptyState() {
     return {
@@ -72,7 +72,8 @@
     const state = await getState();
     state.settings = {
       reservePoints: Math.max(0, Number($('reserve').value) || 0),
-      confirmEachDraw: $('confirmEachDraw').checked
+      confirmEachDraw: $('confirmEachDraw').checked,
+      adRemovalEnabled: $('adRemovalEnabled').checked
     };
     await chrome.storage.local.set({ [STORAGE_KEY]: state });
     render(state);

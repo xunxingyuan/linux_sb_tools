@@ -24,7 +24,8 @@
       confirmEachDraw: true,
       forgeExcludedNames: ['路人甲'],
       forgeKeepOne: true,
-      forgeTarget: 'SR'
+      forgeTarget: 'SR',
+      adRemovalEnabled: false
     }
   };
 

@@ -1,0 +1,4 @@
+html.linux-sb-ad-removal-enabled .sidebar-promotions-card,
+html.linux-sb-ad-removal-enabled .sidebar-promotions-wrap {
+  display: none !important;
+}

@@ -4,19 +4,17 @@
 }
 
 body {
-  width: 340px;
+  width: 360px;
   margin: 0;
   background: #f8fafc;
   color: #1f2937;
 }
 
 .popup {
-  padding: 16px;
+  padding: 15px;
 }
 
-.popup-header,
-.button-row,
-.setting-row {
+.popup-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -24,11 +22,11 @@ body {
 
 .popup-header {
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 11px;
 }
 
 .popup-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
 }
 
@@ -47,8 +45,8 @@ body {
 }
 
 .status {
-  min-height: 18px;
-  margin-bottom: 10px;
+  min-height: 17px;
+  margin-bottom: 9px;
   color: #6b7280;
   font-size: 12px;
 }
@@ -60,12 +58,12 @@ body {
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 7px;
 }
 
 .metric {
-  padding: 10px;
-  border-radius: 10px;
+  padding: 9px 10px;
+  border-radius: 9px;
   background: #fff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
@@ -78,42 +76,59 @@ body {
 
 .metric strong {
   display: block;
-  margin-top: 3px;
-  font-size: 18px;
+  margin-top: 2px;
+  font-size: 17px;
 }
 
-.section {
-  margin-top: 14px;
-  padding-top: 14px;
+.page-actions {
+  margin-top: 13px;
+  padding-top: 12px;
   border-top: 1px solid #e5e7eb;
 }
 
-.section-title {
-  margin-bottom: 8px;
-  font-weight: 700;
+.refresh-button {
+  width: 100%;
+  min-height: 35px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.setting-row {
+.page-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 7px;
+}
+
+.page-grid button {
+  min-height: 32px;
+  padding: 6px 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.utility-row {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  min-height: 30px;
-  color: #4b5563;
-  font-size: 12px;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eef2f7;
 }
 
-.setting-row input[type="number"] {
-  width: 92px;
-  padding: 5px 7px;
-  border: 1px solid #d1d5db;
-  border-radius: 7px;
-  font: inherit;
+.toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: #6b7280;
+  font-size: 11px;
+  cursor: pointer;
 }
 
-.checkbox-row input {
+.toggle-row input {
   margin: 0;
-}
-
-.button-row {
-  margin-top: 12px;
 }
 
 button {
@@ -149,11 +164,14 @@ button:disabled {
 }
 
 .text-button {
-  display: block;
-  width: 100%;
-  margin-top: 10px;
-  padding: 4px;
+  flex: 0 0 auto;
+  padding: 3px 2px;
   border: 0;
   background: transparent;
   color: #6b7280;
+  font-size: 11px;
+}
+
+.text-button:hover {
+  border: 0;
 }

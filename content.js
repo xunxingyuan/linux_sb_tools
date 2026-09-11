@@ -4,32 +4,8 @@
   const parser = globalThis.LinuxSbTitleStats;
   if (!parser || location.hostname !== 'linux.sb') return;
 
-  const STORAGE_KEY = 'linuxSbTitleAssistantState';
-  const DEFAULT_FORGE_EXCLUSIONS = ['路人甲', '反贼'];
-  const DEFAULT_STATE = {
-    version: 1,
-    updatedAt: '',
-    userId: '',
-    current: {
-      points: null,
-      pool: [],
-      titles: [],
-      inventory: [],
-      ownedTypes: null,
-      totalTypes: null
-    },
-    historyRows: [],
-    forgeEvents: [],
-    settings: {
-      reservePoints: 0,
-      confirmEachDraw: true,
-      forgeExcludedNames: [...DEFAULT_FORGE_EXCLUSIONS],
-      forgeKeepOne: true,
-      forgeTarget: 'SR',
-      adRemovalEnabled: false
-    }
-  };
-
+  const store = globalThis.LinuxSbState;
+  const STORAGE_KEY = store.STORAGE_KEY;
   const route = location.pathname;
   const isGachaPage = route === '/gacha';
   const isForgePage = route === '/gacha_forge_center';
@@ -37,37 +13,45 @@
 
   let state = null;
   let panel = null;
-  let allowNextSubmit = false;
-
-  function cloneDefaultState() {
-    return JSON.parse(JSON.stringify(DEFAULT_STATE));
-  }
+  let allowedForm = null;
+  let updatePromise = null;
+  let forgeRunning = false;
+  let forgeTask = null;
+  let forgeStatus = '';
+  let forgeStatusTaskId = '';
+  let syncForgeControls = () => {};
+  const documentToken = crypto.randomUUID();
+  const folded = new Map();
 
   async function loadState() {
-    const stored = await chrome.storage.local.get(STORAGE_KEY);
-    const saved = stored[STORAGE_KEY] || {};
-    const next = cloneDefaultState();
-    Object.assign(next, saved);
-    next.current = { ...DEFAULT_STATE.current, ...(saved.current || {}) };
-    const savedSettings = saved.settings || {};
-    next.settings = { ...DEFAULT_STATE.settings, ...savedSettings };
-    if (!Array.isArray(savedSettings.forgeExcludedNames)
-      || (savedSettings.forgeExcludedNames.length === 1 && savedSettings.forgeExcludedNames[0] === '路人甲')) {
-      next.settings.forgeExcludedNames = [...DEFAULT_FORGE_EXCLUSIONS];
-    }
-    next.historyRows = Array.isArray(saved.historyRows) ? saved.historyRows : [];
-    next.forgeEvents = Array.isArray(saved.forgeEvents) ? saved.forgeEvents : [];
-    return next;
+    return store.request('GET', { userId: parser.findUserId(document) });
   }
 
-  async function saveState(nextState) {
-    nextState.updatedAt = new Date().toISOString();
-    state = nextState;
-    await chrome.storage.local.set({ [STORAGE_KEY]: nextState });
+  async function requireAccount() {
+    const userId = parser.findUserId(document);
+    if (!userId) throw new Error('未确认当前登录账号，请登录并刷新页面');
+    if (state?.userId !== userId) state = await store.request('GET', { userId });
+    return userId;
+  }
+
+  function details(key, label, build) {
+    const node = element('details', 'lsa-details');
+    node.open = folded.get(key) || false;
+    node.append(element('summary', '', label));
+    const body = element('div', 'lsa-details-body');
+    node.append(body);
+    let built = false;
+    const populate = () => { if (!built) { build(body); built = true; } };
+    if (node.open) populate();
+    node.addEventListener('toggle', () => {
+      folded.set(key, node.open);
+      if (node.open) populate();
+    });
+    return node;
   }
 
   function formatNumber(value) {
-    return Number.isFinite(Number(value)) ? Number(value).toLocaleString('zh-CN') : '—';
+    return value !== null && value !== undefined && Number.isFinite(Number(value)) ? Number(value).toLocaleString('zh-CN') : '—';
   }
 
   function element(tag, className, text) {
@@ -202,11 +186,7 @@
     parent.append(section);
   }
 
-  const FORGE_STAGES = [
-    { source: 'N', target: 'R', cost: 3, label: 'N × 3 → R' },
-    { source: 'R', target: 'SR', cost: 3, label: 'R × 3 → SR' },
-    { source: 'SR', target: 'SSR', cost: 8, label: 'SR × 8 → SSR' }
-  ];
+  const FORGE_STAGES = globalThis.LinuxSbForge.STAGES;
 
   function forgeMaterialRows(sourceRarity) {
     const rarity = sourceRarity.toLowerCase();
@@ -277,7 +257,7 @@
     return {
       targetRarity,
       stages,
-      summary: consumed.length ? `预计消耗 ${consumed.join('、')}，生成 ${outputText}` : `当前没有可熔铸材料，暂不能生成 ${output.target}`
+      summary: consumed.length ? `理论上限：各阶段最多消耗 ${consumed.join('、')}，最终生成 ${outputText}。新产出仍需扣除排除项和保留数量，实际结果以每阶段库存为准。` : `当前没有可熔铸材料，暂不能生成 ${output.target}`
     };
   }
 
@@ -299,8 +279,7 @@
 
     const countInput = plan.form.querySelector('[data-gacha-forge-count]');
     if (countInput) countInput.value = String(plan.cycles);
-    plan.button.disabled = false;
-    return true;
+    return !plan.button.disabled && plan.form.checkValidity();
   }
 
   function clearForgeConfirm() {
@@ -323,186 +302,178 @@
     cancel.addEventListener('click', clearForgeConfirm);
     submit.addEventListener('click', async () => {
       submit.disabled = true;
-      await chrome.storage.local.set({
-        pendingForgeChain: {
-          targetRarity,
-          excludedNames: Array.from(settings.excludedNames || []),
-          keepOne: settings.keepOne,
-          stageIndex: 0,
-          startedAt: new Date().toISOString()
-        }
-      });
-      clearForgeConfirm();
-      await resumeForgeChain();
+      try {
+        const userId = await requireAccount();
+        forgeTask = await store.request('FORGE_START', {
+          userId, targetRarity, excludedNames: Array.from(settings.excludedNames || []), keepOne: settings.keepOne
+        });
+        clearForgeConfirm();
+        renderForgeProgress();
+        await resumeForgeChain();
+      } catch (error) {
+        submit.disabled = false;
+        showNotice(error.message, 'error');
+      }
     });
     actions.append(cancel, submit);
     confirm.append(actions);
     panel.append(confirm);
   }
 
+  function renderForgeProgress(message) {
+    panel?.querySelector('.lsa-forge-progress')?.remove();
+    if (!forgeTask) return;
+    if (forgeStatusTaskId !== forgeTask.id) { forgeStatus = ''; forgeStatusTaskId = forgeTask.id; }
+    if (message !== undefined) forgeStatus = message;
+    const row = element('div', 'lsa-forge-progress');
+    row.setAttribute('aria-live', 'polite');
+    row.append(element('span', '', forgeStatus || `熔铸至 ${forgeTask.targetRarity} · 阶段 ${Math.min(forgeTask.stageIndex + 1, 3)}/${forgeTask.targetRarity === 'SSR' ? 3 : 2}`));
+    const stop = element('button', 'lsa-small-button', '停止任务');
+    stop.addEventListener('click', async () => {
+      stop.disabled = true;
+      try {
+        await store.request('FORGE_STOP', { userId: state.userId, id: forgeTask.id });
+        forgeTask = null;
+        row.remove();
+        render();
+        showNotice('已停止后续阶段；已提交的操作仍由站点处理。');
+      } catch (error) { stop.disabled = false; showNotice(error.message, 'error'); }
+    });
+    row.append(stop);
+    panel.append(row);
+  }
+
   async function resumeForgeChain() {
-    const stored = await chrome.storage.local.get('pendingForgeChain');
-    const chain = stored.pendingForgeChain;
-    if (!chain) return;
-    if (chain.startedAt && Date.now() - new Date(chain.startedAt).getTime() > 15 * 60 * 1000) {
-      await chrome.storage.local.remove('pendingForgeChain');
-      showNotice('一键熔铸任务已超时，请重新发起。', 'error');
-      return;
-    }
-
-    const lastStage = chain.targetRarity === 'SSR' ? 2 : 1;
-    let stageIndex = Math.max(0, Number(chain.stageIndex) || 0);
-    const settings = {
-      excludedNames: Array.isArray(chain.excludedNames) ? chain.excludedNames : [...DEFAULT_FORGE_EXCLUSIONS],
-      keepOne: chain.keepOne !== false
-    };
-    while (stageIndex <= lastStage) {
-      const plan = forgeStagePlan(stageIndex, settings);
-      if (!plan || !plan.cycles || !plan.form || !plan.button) {
-        stageIndex += 1;
-        await chrome.storage.local.set({ pendingForgeChain: { ...chain, stageIndex } });
-        continue;
-      }
-
-      const applied = applyForgeStagePlan(plan);
-      if (!applied) {
-        await chrome.storage.local.remove('pendingForgeChain');
-        showNotice(`无法准备 ${plan.label}，请使用站点原生熔炼操作。`, 'error');
+    if (forgeRunning) return;
+    forgeRunning = true;
+    try {
+      const userId = await requireAccount();
+      let chain = await store.request('FORGE_GET', { userId });
+      forgeTask = chain;
+      if (!chain) return;
+      renderForgeProgress();
+      if (!chain.ownedByTab) {
+        renderForgeProgress('任务由另一个标签页执行');
         return;
       }
-      await chrome.storage.local.set({
-        pendingForgeChain: {
-          ...chain,
-          stageIndex: stageIndex + 1,
-          lastStage: plan.label
+      if (chain.phase === 'awaiting') {
+        const profile = await fetchProfile();
+        chain = await store.request('FORGE_STEP', { userId, id: chain.id, documentToken, inventory: profile.inventory });
+        forgeTask = chain;
+      }
+      const lastStage = chain.targetRarity === 'SSR' ? 2 : 1;
+      while (chain.stageIndex <= lastStage) {
+        const plan = forgeStagePlan(chain.stageIndex, chain);
+        if (!plan?.form || !plan.button) throw new Error('未找到站点熔铸表单，任务已暂停，请停止后核对页面');
+        if (!plan.cycles) {
+          chain = await store.request('FORGE_STEP', { userId, id: chain.id, stageIndex: chain.stageIndex, skip: true });
+          forgeTask = chain;
+          continue;
         }
-      });
-      showNotice(`正在执行 ${forgeStageSummary(plan)}。`);
-      // The plugin already displayed its own confirmation. The forum's inline
-      // handler only shows another confirm dialog and does not fill the route;
-      // native form.submit() keeps the site's generated forge_count intact.
-      plan.form.submit();
-      return;
+        renderForgeProgress(`即将执行 ${forgeStageSummary(plan)}，3 秒后继续`);
+        await new Promise(resolve => window.setTimeout(resolve, 3000));
+        const fresh = await store.request('FORGE_GET', { userId });
+        if (!fresh || fresh.id !== chain.id) return;
+        // Fetch current account and inventory immediately before spending material.
+        const profile = await fetchProfile();
+        for (const row of plan.rows.filter(row => row.selectedQuantity > 0)) {
+          const current = profile.inventory.find(item => item.rarity === plan.source && item.name === row.name);
+          if (!current || current.count !== row.available) throw new Error('库存已变化，任务已暂停，请刷新后核对');
+        }
+        if (!applyForgeStagePlan(plan)) throw new Error('站点暂不允许提交，任务已暂停');
+        const proof = {
+          stageIndex: chain.stageIndex, cycles: plan.cycles, before: profile.inventory,
+          selected: plan.rows.filter(row => row.selectedQuantity > 0).map(row => ({ name: row.name, quantity: row.selectedQuantity }))
+        };
+        forgeTask = await store.request('FORGE_STEP', { userId, id: chain.id, documentToken, proof });
+        renderForgeProgress(`已提交 ${plan.label}，等待站点结果；刷新后核对库存再继续`);
+        // Native submission retains the site's generated action and hidden fields.
+        HTMLFormElement.prototype.submit.call(plan.form);
+        return;
+      }
+      await store.request('FORGE_STOP', { userId, id: chain.id });
+      forgeTask = null;
+      render();
+      showNotice('可执行的熔铸阶段已完成，库存不足的阶段已跳过。');
+    } catch (error) {
+      if (forgeTask) renderForgeProgress(error.message);
+      else showNotice(error.message, 'error');
+    } finally {
+      forgeRunning = false;
     }
-
-    await chrome.storage.local.remove('pendingForgeChain');
-    showNotice(`一键熔铸已完成，目标为 ${chain.targetRarity}。`);
   }
 
   function renderForgeAssistant(parent) {
-    const section = element('section', 'lsa-section lsa-forge-section');
-    const head = element('div', 'lsa-section-head');
-    head.append(element('div', 'lsa-section-title', '称号熔炼助手'));
-    head.append(element('div', 'lsa-muted', '自动分阶段执行'));
-    section.append(head);
-
-    const options = element('div', 'lsa-forge-options');
-    const keepLabel = document.createElement('label');
-    const keep = document.createElement('input');
+    const toolbar = element('div', 'lsa-toolbar');
+    toolbar.append(element('strong', 'lsa-title', '熔铸助手'));
+    const targetLabel = element('label', '', '目标 ');
+    const target = element('select');
+    for (const rarity of ['SR', 'SSR']) {
+      const option = element('option', '', rarity);
+      option.value = rarity;
+      target.append(option);
+    }
+    target.value = state.settings.forgeTarget;
+    targetLabel.append(target);
+    const keepLabel = element('label');
+    const keep = element('input');
     keep.type = 'checkbox';
     keep.checked = state.settings.forgeKeepOne !== false;
-    keepLabel.append(keep, element('span', '', '每种称号保留 1 个'));
-    options.append(keepLabel);
-
-    const exclusionBox = element('div', 'lsa-forge-exclusion-box');
-    exclusionBox.append(element('div', 'lsa-muted', '排除称号（可多选）'));
-    const selectableTitles = (state.current.titles || []).filter((item) => ['SR', 'R', 'N'].includes(item.rarity));
-    const selectableNames = new Set(selectableTitles.map((item) => item.name));
-    const savedExcluded = Array.isArray(state.settings.forgeExcludedNames)
-      ? state.settings.forgeExcludedNames
-      : DEFAULT_FORGE_EXCLUSIONS;
-    const excludedNames = new Set(savedExcluded.filter((name) => selectableNames.has(name)));
-    const exclusionInputs = [];
-    const exclusionOptions = element('div', 'lsa-forge-exclusion-options');
-    ['SR', 'R', 'N'].forEach((rarity) => {
-      const titles = selectableTitles.filter((item) => item.rarity === rarity);
-      if (!titles.length) return;
-      const group = element('div', 'lsa-forge-exclusion-group');
-      group.append(element('div', 'lsa-forge-exclusion-rarity', rarity));
-      const items = element('div', 'lsa-forge-exclusion-items');
-      titles.forEach((item) => {
-        const label = document.createElement('label');
-        label.className = 'lsa-forge-exclusion-item';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.value = item.name;
-        checkbox.checked = excludedNames.has(item.name);
-        label.append(checkbox, element('span', '', `${item.icon ? `${item.icon} ` : ''}${item.name}`));
-        items.append(label);
-        exclusionInputs.push(checkbox);
-      });
-      group.append(items);
-      exclusionOptions.append(group);
-    });
-    exclusionBox.append(exclusionOptions, element('div', 'lsa-muted', '勾选的称号不会作为熔铸材料；仅显示 SR、R、N 称号'));
-
-    const targetOptions = element('div', 'lsa-forge-targets');
-    const targetTitle = element('div', 'lsa-muted lsa-forge-target-title', '熔铸目标');
-    const targetGroup = element('div', 'lsa-forge-target-group');
-    const targetSrLabel = document.createElement('label');
-    const targetSr = document.createElement('input');
-    targetSr.type = 'radio';
-    targetSr.name = 'lsa-forge-target';
-    targetSr.value = 'SR';
-    targetSr.checked = state.settings.forgeTarget !== 'SSR';
-    targetSrLabel.append(targetSr, element('span', '', '仅熔铸到 SR'));
-    const targetSsrLabel = document.createElement('label');
-    const targetSsr = document.createElement('input');
-    targetSsr.type = 'radio';
-    targetSsr.name = 'lsa-forge-target';
-    targetSsr.value = 'SSR';
-    targetSsr.checked = state.settings.forgeTarget === 'SSR';
-    targetSsrLabel.append(targetSsr, element('span', '', '熔铸到 SR 后继续到 SSR'));
-    targetGroup.append(targetSrLabel, targetSsrLabel);
-    targetOptions.append(targetTitle, targetGroup);
-
-    const persistForgeSettings = () => {
-      state.settings = {
-        ...state.settings,
-        forgeExcludedNames: Array.from(excludedNames),
-        forgeKeepOne: keep.checked,
-        forgeTarget: targetSsr.checked ? 'SSR' : 'SR'
-      };
-      chrome.storage.local.set({ [STORAGE_KEY]: state });
+    keepLabel.append(keep, element('span', '', '每种保留 1 个'));
+    const button = element('button', 'lsa-primary lsa-small-button', '一键熔铸');
+    toolbar.append(targetLabel, keepLabel, button);
+    parent.append(toolbar);
+    let excluded = new Set(state.settings.forgeExcludedNames);
+    let preview = null;
+    let exclusionSummary = null;
+    const collect = () => ({ excludedNames: [...excluded], keepOne: keep.checked });
+    const updatePreview = () => {
+      const sequence = forgeSequencePreview(target.value, collect());
+      if (preview) preview.textContent = sequence.summary;
+      button.disabled = Boolean(forgeTask) || !state.userId || !sequence.stages.some(plan => plan.cycles > 0);
+      target.disabled = Boolean(forgeTask);
+      keep.disabled = Boolean(forgeTask);
+      parent.querySelectorAll('.lsa-forge-exclusion-items input').forEach(input => { input.disabled = Boolean(forgeTask); });
+      if (exclusionSummary) exclusionSummary.textContent = `排除 ${excluded.size} 项 · 查看预估`;
     };
-
-    const syncExcludedNames = () => {
-      excludedNames.clear();
-      exclusionInputs.filter((input) => input.checked).forEach((input) => excludedNames.add(input.value));
-    };
-    const handleExclusionChange = () => {
-      syncExcludedNames();
-      persistForgeSettings();
+    const persist = async (patch) => {
+      state.settings = { ...state.settings, ...patch };
       updatePreview();
+      try { await store.request('SETTINGS', { userId: state.userId, patch }); }
+      catch (error) { showNotice(error.message, 'error'); }
     };
-    exclusionInputs.forEach((input) => input.addEventListener('change', handleExclusionChange));
-    keep.addEventListener('change', () => {
-      persistForgeSettings();
+    target.addEventListener('change', () => persist({ forgeTarget: target.value }));
+    keep.addEventListener('change', () => persist({ forgeKeepOne: keep.checked }));
+    const extra = details('forge-options', `排除 ${excluded.size} 项 · 查看预估`, body => {
+      const list = element('div', 'lsa-forge-exclusion-items');
+      const titles = new Map(state.current.titles.filter(item => ['N', 'R', 'SR'].includes(item.rarity)).map(item => [item.name, item]));
+      for (const name of excluded) if (!titles.has(name)) titles.set(name, { name, rarity: '' });
+      for (const item of titles.values()) {
+        const label = element('label', 'lsa-forge-exclusion-item');
+        const input = element('input');
+        input.type = 'checkbox'; input.value = item.name; input.checked = excluded.has(item.name);
+        input.addEventListener('change', () => {
+          if (input.checked) excluded.add(item.name); else excluded.delete(item.name);
+          persist({ forgeExcludedNames: [...excluded] });
+        });
+        label.append(input, element('span', '', `${item.rarity} ${item.name}`.trim()));
+        list.append(label);
+      }
+      preview = element('div', 'lsa-forge-preview');
+      body.append(list, preview);
       updatePreview();
     });
-
-    const preview = element('div', 'lsa-forge-preview');
-    const button = element('button', 'lsa-primary', '一键熔铸');
-    function updatePreview() {
-      const settings = { excludedNames: Array.from(excludedNames), keepOne: keep.checked };
-      const target = targetSsr.checked ? 'SSR' : 'SR';
-      const sequence = forgeSequencePreview(target, settings);
-      preview.textContent = sequence.summary;
-      button.disabled = !sequence.stages.some((plan) => plan && plan.cycles > 0);
-      button.dataset.target = target;
-    }
-    [targetSr, targetSsr].forEach((control) => control.addEventListener('change', () => {
-      persistForgeSettings();
+    exclusionSummary = extra.querySelector('summary');
+    parent.append(extra);
+    button.addEventListener('click', () => showForgeConfirm(target.value, collect(), forgeSequencePreview(target.value, collect())));
+    syncForgeControls = () => {
+      target.value = state.settings.forgeTarget;
+      keep.checked = state.settings.forgeKeepOne !== false;
+      excluded = new Set(state.settings.forgeExcludedNames);
+      extra.querySelectorAll('input[type="checkbox"]').forEach(input => { input.checked = excluded.has(input.value); });
       updatePreview();
-    }));
-    button.addEventListener('click', () => {
-      const target = button.dataset.target || 'SR';
-      const settings = { excludedNames: Array.from(excludedNames), keepOne: keep.checked };
-      showForgeConfirm(target, settings, forgeSequencePreview(target, settings));
-    });
+    };
     updatePreview();
-    section.append(options, exclusionBox, targetOptions, preview, button);
-    parent.append(section);
   }
 
   function renderMissing(parent) {
@@ -534,7 +505,8 @@
       notice.style.color = '#991b1b';
     }
     panel.append(notice);
-    window.setTimeout(() => notice.remove(), 8000);
+    notice.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    if (kind !== 'error') window.setTimeout(() => notice.remove(), 8000);
   }
 
   function clearConfirm() {
@@ -554,7 +526,7 @@
     cancel.addEventListener('click', clearConfirm);
     submit.addEventListener('click', () => {
       submit.disabled = true;
-      allowNextSubmit = true;
+      allowedForm = form;
       clearConfirm();
       if (typeof form.requestSubmit === 'function') form.requestSubmit();
       else form.submit();
@@ -573,18 +545,21 @@
         const cost = Number(button && button.dataset.cost) || 0;
         const modeLabel = button ? button.textContent.replace(/\s*\(.*/, '').trim() : '抽取';
 
-        if (allowNextSubmit) {
-          allowNextSubmit = false;
+        const reserve = Math.max(0, Number(state.settings.reservePoints || 0));
+        if (!parser.findUserId(document) || !Number.isFinite(state.current.points) || !cost) {
+          event.preventDefault();
+          allowedForm = null;
+          showNotice('未确认账号、余额或抽取费用，请更新数据后再试。', 'error');
           return;
         }
-
-        const reserve = Math.max(0, Number(state.settings.reservePoints || 0));
-        if (Number.isFinite(state.current.points) && state.current.points - cost < reserve) {
+        if (state.current.points - cost < reserve) {
+          allowedForm = null;
           event.preventDefault();
           showNotice(`余额保护已阻止本次操作：至少保留 ${formatNumber(reserve)} 积分。`, 'error');
           return;
         }
 
+        if (allowedForm === form) { allowedForm = null; return; }
         if (state.settings.confirmEachDraw) {
           event.preventDefault();
           showDrawConfirm(form, cost, modeLabel);
@@ -594,109 +569,129 @@
   }
 
   async function fetchDocument(url) {
-    const response = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
+    const expected = await requireAccount();
+    const response = await fetch(url, {
+      credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'text/html' }, signal: AbortSignal.timeout(20000)
+    });
     if (!response.ok) throw new Error(`请求失败（${response.status}）`);
-    return new DOMParser().parseFromString(await response.text(), 'text/html');
+    const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+    if (parser.findUserId(doc) !== expected) throw new Error('登录状态或账号已变化，请刷新页面；原账号数据已保留');
+    return doc;
   }
 
   async function fetchProfile() {
-    return parser.parseProfilePage(await fetchDocument('/gacha_profile'));
+    const doc = await fetchDocument('/gacha_profile');
+    if (!doc.querySelector('.gacha-center-stat')) throw new Error('无法识别称号库存页面，本地库存已保留');
+    const profile = parser.parseProfilePage(doc);
+    if (profile.ownedTypes > 0 && !profile.inventory.length) throw new Error('库存解析不完整，请稍后重试');
+    return profile;
   }
 
   async function refreshCurrentData() {
-    const page = parser.parseGachaPage(document);
-    const profile = await fetchProfile().catch(() => null);
-    state.userId = parser.findUserId(document) || state.userId;
-    state.current = {
-      ...state.current,
-      points: page && page.points !== null ? page.points : (parser.parseCurrentPoints(document) ?? state.current.points),
-      pool: page ? page.pool : state.current.pool,
-      titles: page ? page.titles : state.current.titles,
-      ownedTypes: profile ? profile.ownedTypes : (page ? page.ownedTypes : state.current.ownedTypes),
-      totalTypes: page && page.totalTypes ? page.totalTypes : state.current.totalTypes,
-      inventory: profile ? profile.inventory : state.current.inventory
-    };
-    await saveState(state);
+    const userId = await requireAccount();
+    // Current HTML can be stale in a long-lived tab, so always fetch a fresh snapshot.
+    const [gachaDoc, profile] = await Promise.all([fetchDocument('/gacha'), fetchProfile()]);
+    const page = parser.parseGachaPage(gachaDoc);
+    if (page.points === null || !page.titles.length) throw new Error('无法识别抽取页面，本地快照已保留');
+    state = await store.request('CURRENT', { userId, current: {
+      points: page.points, pool: page.pool, titles: page.titles,
+      ownedTypes: profile.ownedTypes, totalTypes: page.totalTypes, inventory: profile.inventory
+    } });
     return profile;
   }
 
-  async function refreshForgePageData() {
-    const profile = await fetchProfile().catch(() => null);
-    const gachaDoc = await fetchDocument('/gacha').catch(() => null);
-    const gacha = gachaDoc ? parser.parseGachaPage(gachaDoc) : null;
-    state.userId = parser.findUserId(document) || state.userId;
-    state.current = {
-      ...state.current,
-      points: parser.parseCurrentPoints(document) ?? (gacha && gacha.points !== null ? gacha.points : state.current.points),
-      pool: gacha && gacha.pool.length ? gacha.pool : state.current.pool,
-      titles: gacha && gacha.titles.length ? gacha.titles : state.current.titles,
-      inventory: profile ? profile.inventory : state.current.inventory,
-      ownedTypes: profile ? profile.ownedTypes : state.current.ownedTypes,
-      totalTypes: gacha && gacha.totalTypes ? gacha.totalTypes : state.current.totalTypes
-    };
-    await saveState(state);
-    return profile;
+  async function syncHistory(rebuild = false) {
+    const userId = await requireAccount();
+    const initial = await store.request('GET', { userId });
+    const payload = { userId, generation: initial.historyGeneration, rebuild, sync: {} };
+    const failures = [];
+    for (const [tab, key, parse, label] of [
+      ['points_rewards', 'historyRows', parser.parsePointsHistoryPage, '积分流水'],
+      ['notifications', 'forgeEvents', parser.parseNotificationPage, '熔铸通知']
+    ]) {
+      try {
+        const result = await globalThis.LinuxSbHistory.collectPages({
+          firstUrl: `${location.origin}/user/${userId}?tab=${tab}&p=1`,
+          fetchPage: async url => {
+            const doc = await fetchDocument(url);
+            const selector = tab === 'points_rewards' ? '.points-rewards-detail' : '.notification-item';
+            if (!doc.querySelector(selector) && !/暂无|没有.*(?:记录|通知|流水)|尚无|空空如也/.test(parser.textOf(doc.querySelector('main')))) {
+              throw new Error('未识别到记录列表，本地历史已保留');
+            }
+            return doc;
+          },
+          parsePage: parse, pageUrls: (doc, url) => parser.parsePaginationUrls(doc, url, tab),
+          known: initial[key], incremental: !rebuild && initial.sync[key]?.complete === true,
+          key: store.recordKey,
+          onProgress: (page, total) => showNotice(`正在更新${label} ${page}/${total} 页…`)
+        });
+        payload[key] = store.mergeRecords([], result.rows);
+        payload.sync[key] = {
+          updatedAt: new Date().toISOString(), pages: result.pages, mode: result.mode,
+          complete: result.reachedEnd || initial.sync[key]?.complete === true,
+          firstTime: result.rows[0]?.time || '', lastTime: result.rows.at(-1)?.time || '', error: ''
+        };
+      } catch (error) {
+        failures.push(`${label}：${error.message}`);
+        payload.sync[key] = { ...initial.sync[key], error: error.message };
+      }
+    }
+    state = await store.request('HISTORY', payload);
+    if (failures.length) throw new Error(`部分更新未完成。${failures.join('；')}`);
   }
 
-  async function syncHistory() {
-    if (!state.userId) state.userId = parser.findUserId(document);
-    if (!state.userId) throw new Error('未找到当前用户编号');
-    const firstUrl = `/user/${state.userId}?tab=points_rewards&p=1`;
-    const firstDoc = await fetchDocument(firstUrl);
-    const urls = parser.parsePaginationUrls(firstDoc, location.origin + firstUrl);
-    const allUrls = Array.from(new Set([firstUrl, ...urls]));
-    const rows = [];
-    for (const url of allUrls) {
-      const doc = url === firstUrl ? firstDoc : await fetchDocument(url);
-      rows.push(...parser.parsePointsHistoryPage(doc));
-    }
-    const unique = new Map();
-    rows.forEach((row) => unique.set(`${row.time}|${row.reason}|${row.change}`, row));
-    state.historyRows = Array.from(unique.values()).sort((a, b) => String(a.time).localeCompare(String(b.time)));
-    let notificationError = null;
-    try {
-      await syncNotifications();
-    } catch (error) {
-      notificationError = error;
-    }
-    await saveState(state);
-    render();
-    showNotice(notificationError
-      ? `已同步 ${state.historyRows.length} 条称号流水；熔炼通知暂时同步失败。`
-      : `已同步 ${state.historyRows.length} 条称号流水和 ${state.forgeEvents.length} 次熔炼记录。`);
-  }
-
-  async function syncNotifications() {
-    if (!state.userId) state.userId = parser.findUserId(document);
-    if (!state.userId) throw new Error('未找到当前用户编号');
-    const firstUrl = `/user/${state.userId}?tab=notifications&p=1`;
-    const firstDoc = await fetchDocument(firstUrl);
-    const urls = parser.parsePaginationUrls(firstDoc, location.origin + firstUrl, 'notifications');
-    const allUrls = Array.from(new Set([firstUrl, ...urls]));
-    const events = [];
-    for (const url of allUrls) {
-      const doc = url === firstUrl ? firstDoc : await fetchDocument(url);
-      events.push(...parser.parseNotificationPage(doc));
-    }
-    const unique = new Map();
-    events.forEach((event) => unique.set(`${event.time}|${event.text}`, event));
-    state.forgeEvents = Array.from(unique.values());
-    return state.forgeEvents;
+  function updateData(rebuild = false) {
+    if (updatePromise) return updatePromise;
+    updatePromise = (async () => {
+      panel?.querySelectorAll('[data-update]').forEach(button => { button.disabled = true; });
+      let snapshotError = null;
+      try { await refreshCurrentData(); } catch (error) { snapshotError = error; }
+      try {
+        await syncHistory(rebuild);
+        if (snapshotError) throw snapshotError;
+        render();
+        showNotice(rebuild ? '已完整重建站点当前可访问的历史。' : '数据已更新。');
+      } catch (error) {
+        render();
+        showNotice(error.message, 'error');
+        throw error;
+      } finally {
+        updatePromise = null;
+        panel?.querySelectorAll('[data-update]').forEach(button => { button.disabled = false; });
+      }
+      return state;
+    })();
+    return updatePromise;
   }
 
   function createPanel() {
     const root = element('section', 'linux-sb-title-assistant');
     root.id = 'linux-sb-title-assistant';
-    const header = element('div', 'lsa-header');
-    const titleWrap = element('div');
-    titleWrap.append(
-      element('div', 'lsa-title', '🧰 LINUX SB 扩展工具箱'),
-      element('div', 'lsa-subtitle', isForgePage ? '称号熔炼助手 · 当前功能' : '称号抽取统计 · 当前功能')
-    );
-    header.append(titleWrap, element('div', 'lsa-header-badge', '本地统计'));
-    root.append(header);
     panel = root;
     return root;
+  }
+
+  function findTitleTabBar(target) {
+    const labels = /我的称号|称号抽取|称号熔炼|称号回收|UR\s*合成|称号交易/;
+    const selectors = [
+      '.gacha-tabs', '.gacha-tab-bar', '.gacha-nav', '.gacha-page-tabs',
+      '[role="tablist"]', '.tab-bar'
+    ];
+    const roots = [...new Set([target, target.parentElement, target.closest('main'), document.body].filter(Boolean))];
+    const candidates = [];
+    for (const root of roots) {
+      for (const selector of selectors) candidates.push(...root.querySelectorAll(selector));
+      candidates.push(...root.querySelectorAll('nav, [class*="tab"], [class*="tabs"]'));
+    }
+    const unique = [...new Set(candidates)];
+    return unique
+      .map((node) => {
+        const controls = node.querySelectorAll('a, button, [role="tab"]');
+        const matched = [...controls].filter((control) => labels.test(control.textContent || '')).length;
+        return { node, matched, controls: controls.length };
+      })
+      .filter((item) => item.matched >= 2)
+      .sort((a, b) => b.matched - a.matched || b.controls - a.controls)[0]?.node || null;
   }
 
   function mountPanel() {
@@ -709,86 +704,54 @@
       if (actions) actions.insertAdjacentElement('beforebegin', root);
       else target.prepend(root);
     } else {
-      target.prepend(root);
+      const tabBar = findTitleTabBar(target);
+      if (tabBar) tabBar.insertAdjacentElement('afterend', root);
+      else target.prepend(root);
     }
   }
 
   function render() {
     if (!panel) mountPanel();
-    while (panel.children.length > 1) panel.lastElementChild.remove();
-
+    panel.replaceChildren();
     if (isForgePage) {
       renderForgeAssistant(panel);
+      renderForgeProgress();
       return;
     }
-
     const summary = parser.summarizeHistory(state.historyRows);
-    const metrics = element('div', 'lsa-metrics');
-    metrics.append(
-      createMetric('当前积分', formatNumber(state.current.points)),
-      createMetric('收集进度', `${state.current.ownedTypes || state.current.inventory.length}/${state.current.totalTypes || '—'}`),
-      createMetric('累计抽取', `${formatNumber(summary.totalPulls)} 次`),
-      createMetric('累计投入', `${formatNumber(summary.totalSpend)} 分`)
-    );
-    panel.append(metrics);
-
-    const actions = element('div', 'lsa-actions');
-    const refresh = element('button', 'lsa-small-button', '刷新页面数据');
-    const sync = element('button', 'lsa-small-button', '同步积分流水');
-    refresh.addEventListener('click', async () => {
-      refresh.disabled = true;
-      try {
-        await refreshCurrentData();
-        render();
-        showNotice('页面数据已刷新。');
-      } catch (error) {
-        showNotice(error.message || '刷新失败。', 'error');
-      } finally {
-        refresh.disabled = false;
-      }
-    });
-    sync.addEventListener('click', async () => {
-      sync.disabled = true;
-      try {
-        await syncHistory();
-      } catch (error) {
-        showNotice(error.message || '积分流水同步失败。', 'error');
-      } finally {
-        sync.disabled = false;
-      }
-    });
-    actions.append(refresh, sync);
-    panel.append(actions);
-
-    if (state.current.inventory.length) renderInventory(panel);
-    if (state.current.titles.length) renderMissing(panel);
-    renderHistorySummary(panel);
-    renderScoreSummary(panel);
-
+    const toolbar = element('div', 'lsa-toolbar');
+    toolbar.append(element('strong', 'lsa-title', '称号统计'));
+    toolbar.append(element('span', 'lsa-inline-stat', `积分 ${formatNumber(state.current.points)}`));
+    toolbar.append(element('span', 'lsa-inline-stat', `收集 ${state.current.ownedTypes ?? '—'}/${state.current.totalTypes ?? '—'}`));
+    const update = element('button', 'lsa-small-button', '更新数据');
+    update.dataset.update = '1'; update.disabled = Boolean(updatePromise);
+    update.addEventListener('click', () => updateData().catch(() => {}));
+    toolbar.append(update);
+    panel.append(toolbar);
+    panel.append(details('statistics', `详细统计 · ${formatNumber(summary.totalPulls)} 抽 · 投入 ${formatNumber(summary.totalSpend)} 分`, body => {
+      const range = element('div', 'lsa-muted');
+      const times = state.historyRows.map(row => row.time).filter(Boolean).sort();
+      const status = state.sync.historyRows;
+      range.textContent = status?.updatedAt
+        ? `上次同步 ${new Date(status.updatedAt).toLocaleString('zh-CN')} · ${status.complete ? '已遍历可访问历史' : '历史尚不完整'}${times.length ? ` · ${times[0]} 至 ${times.at(-1)}` : ''}${status.error ? ' · 最近同步失败' : ''}`
+        : '尚未同步历史';
+      body.append(range);
+      body.append(details('inventory', `当前库存 · ${state.current.inventory.length} 种`, renderInventory));
+      body.append(details('missing', `未收集 · ${missingTitles().length} 种`, renderMissing));
+      renderHistorySummary(body);
+      renderScoreSummary(body);
+      const rebuild = element('button', 'lsa-small-button', '完整重建历史');
+      rebuild.dataset.update = '1'; rebuild.disabled = Boolean(updatePromise);
+      rebuild.addEventListener('click', () => updateData(true).catch(() => {}));
+      body.append(rebuild, element('div', 'lsa-muted', '重新读取站点所有可访问记录；成功后替换该账号本地历史。'));
+    }));
   }
 
   async function handleMessage(message) {
-    if (!message || !message.type) return { ok: false };
-    if (message.type === 'GET_SNAPSHOT') {
-      return { ok: true, state };
-    }
-    if (message.type === 'REFRESH') {
-      try {
-        if (isForgePage) await refreshForgePageData();
-        else await refreshCurrentData();
-        render();
-        return { ok: true, state };
-      } catch (error) {
-        return { ok: false, error: error.message };
-      }
-    }
-    if (message.type === 'SYNC_HISTORY') {
-      try {
-        await syncHistory();
-        return { ok: true, state };
-      } catch (error) {
-        return { ok: false, error: error.message };
-      }
+    if (message?.type === 'GET_SNAPSHOT') return { ok: true, state };
+    if (message?.type === 'UPDATE_DATA') {
+      try { await updateData(); return { ok: true, state }; }
+      catch (error) { return { ok: false, error: error.message }; }
     }
     return { ok: false };
   }
@@ -799,34 +762,34 @@
   });
 
   chrome.storage.onChanged.addListener(async (changes, areaName) => {
-    if (areaName !== 'local' || !changes[STORAGE_KEY]) return;
-    state = await loadState();
-    if (panel) {
-      render();
-      if (isGachaPage) attachDrawGuards();
+    if (areaName !== 'local' || !changes[STORAGE_KEY] || !state) return;
+    const root = store.normalize(changes[STORAGE_KEY].newValue);
+    const next = store.snapshot(root, state.userId);
+    const dataChanged = JSON.stringify([state.current, state.historyRows, state.forgeEvents, state.sync]) !== JSON.stringify([next.current, next.historyRows, next.forgeEvents, next.sync]);
+    state = next;
+    forgeTask = next.pendingForge;
+    if (!panel) return;
+    if (isForgePage) {
+      syncForgeControls();
+      renderForgeProgress();
+    } else if (dataChanged && !updatePromise) {
+      // Defer data refresh while a confirmation or a focused control is in use.
+      if (!panel.querySelector('.lsa-confirm') && !panel.contains(document.activeElement)) render();
     }
   });
 
   (async function init() {
     state = await loadState();
-    if (isGachaPage) {
-      try {
-        await refreshCurrentData();
-      } catch (error) {
-        console.warn('[LINUX SB 称号助手]', error);
-      }
-      mountPanel();
+    forgeTask = state.pendingForge;
+    mountPanel();
+    render();
+    if (isGachaPage) attachDrawGuards();
+    try {
+      await refreshCurrentData();
       render();
-      attachDrawGuards();
-    } else if (isForgePage) {
-      try {
-        await refreshForgePageData();
-      } catch (error) {
-        console.warn('[LINUX SB 扩展工具箱]', error);
-      }
-      mountPanel();
-      render();
-      await resumeForgeChain();
+      if (isForgePage) await resumeForgeChain();
+    } catch (error) {
+      showNotice(error.message, 'error');
     }
-  })();
+  })().catch(error => { if (panel) showNotice(error.message, 'error'); });
 })();

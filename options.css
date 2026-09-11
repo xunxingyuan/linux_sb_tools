@@ -101,6 +101,14 @@ h2 {
   line-height: 1.5;
 }
 
+.account-label {
+  display: block;
+  margin: 16px 0 10px;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .button-row {
   display: flex;
   gap: 10px;
@@ -238,3 +246,7 @@ button.primary:hover {
 .compact-field input[type="number"] {
   width: 180px;
 }
+
+.options details { margin: 12px 0; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; }
+.options summary { cursor: pointer; font-weight: 600; }
+.options details[open] summary { margin-bottom: 14px; }

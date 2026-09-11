@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LINUX SB 扩展工具箱",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "LINUX SB 扩展工具箱，提供称号抽取统计、熔铸助手、图片压缩上传和可选去广告。",
   "permissions": [
     "storage",
@@ -21,27 +21,61 @@
   "options_page": "options.html",
   "content_scripts": [
     {
-      "matches": ["https://linux.sb/gacha"],
-      "js": ["lib/parser.js", "content.js"],
-      "css": ["content.css"],
+      "matches": [
+        "https://linux.sb/gacha"
+      ],
+      "js": [
+        "lib/state.js",
+        "lib/parser.js",
+        "lib/forge.js",
+        "lib/history.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://linux.sb/gacha_forge_center"],
-      "js": ["lib/parser.js", "content.js"],
-      "css": ["content.css"],
+      "matches": [
+        "https://linux.sb/gacha_forge_center"
+      ],
+      "js": [
+        "lib/state.js",
+        "lib/parser.js",
+        "lib/forge.js",
+        "lib/history.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://linux.sb/topic_edit", "https://linux.sb/topic/*"],
-      "js": ["image-host.js"],
-      "css": ["image-host.css"],
+      "matches": [
+        "https://linux.sb/topic_edit",
+        "https://linux.sb/topic/*"
+      ],
+      "js": [
+        "lib/state.js",
+        "image-host.js"
+      ],
+      "css": [
+        "image-host.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://linux.sb/*"],
-      "js": ["ad-remover.js"],
-      "css": ["ad-remover.css"],
+      "matches": [
+        "https://linux.sb/*"
+      ],
+      "js": [
+        "ad-remover.js"
+      ],
+      "css": [
+        "ad-remover.css"
+      ],
       "run_at": "document_idle"
     }
   ]

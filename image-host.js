@@ -7,13 +7,7 @@
 
   const CONFIG_KEY = 'linuxSbImageHostConfig';
   const MAX_IMAGE_BYTES = 32 * 1024 * 1024;
-  const DEFAULT_IMAGE_SETTINGS = {
-    enabled: false,
-    provider: 'cloudflare-r2',
-    compressionEnabled: true,
-    compressionQuality: 0.84,
-    maxDimension: 2560
-  };
+  const publicSettings = globalThis.LinuxSbState.imageSettings;
   const COMPRESSIBLE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
   let host = null;
   let textarea = null;
@@ -25,9 +19,9 @@
   async function loadConfig() {
     try {
       const response = await chrome.runtime.sendMessage({ type: 'GET_IMAGE_HOST_SETTINGS' });
-      return { ...DEFAULT_IMAGE_SETTINGS, ...((response && response.ok && response.settings) || {}) };
+      return publicSettings((response && response.ok && response.settings) || undefined);
     } catch (_error) {
-      return { ...DEFAULT_IMAGE_SETTINGS };
+      return publicSettings();
     }
   }
 
@@ -49,18 +43,6 @@
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  function normalizedQuality(value) {
-    const quality = Number(value);
-    return Number.isFinite(quality) ? Math.min(0.95, Math.max(0.5, quality)) : 0.84;
-  }
-
-  function normalizedMaxDimension(value) {
-    const maxDimension = Number(value);
-    return Number.isFinite(maxDimension)
-      ? Math.round(Math.min(8192, Math.max(512, maxDimension)))
-      : 2560;
   }
 
   async function decodeImage(file) {
@@ -117,7 +99,7 @@
     let decoded = null;
     try {
       decoded = await decodeImage(file);
-      const maxDimension = normalizedMaxDimension(settings.maxDimension);
+      const maxDimension = settings.maxDimension;
       const longestSide = Math.max(decoded.width, decoded.height);
       const scale = Math.min(1, maxDimension / longestSide);
       const width = Math.max(1, Math.round(decoded.width * scale));
@@ -131,7 +113,7 @@
       context.imageSmoothingQuality = 'high';
       context.drawImage(decoded.source, 0, 0, width, height);
       const compressed = await new Promise((resolve) => {
-        canvas.toBlob(resolve, 'image/webp', normalizedQuality(settings.compressionQuality));
+        canvas.toBlob(resolve, 'image/webp', settings.compressionQuality);
       });
       if (!compressed || compressed.size >= file.size) return original;
 

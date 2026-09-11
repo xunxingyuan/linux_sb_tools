@@ -1,3 +1,4 @@
+importScripts('lib/state.js', 'lib/forge.js', 'lib/store-worker.js');
 (function () {
   'use strict';
 
@@ -50,30 +51,8 @@
   async function loadConfig() {
     const stored = await chrome.storage.local.get(CONFIG_KEY);
     return {
-      enabled: false,
-      provider: 'cloudflare-r2',
-      accountId: '',
-      bucket: '',
-      accessKeyId: '',
-      secretAccessKey: '',
-      publicBaseUrl: '',
-      objectPrefix: 'linux-sb',
-      compressionEnabled: true,
-      compressionQuality: 0.84,
-      maxDimension: 2560,
+      ...globalThis.LinuxSbState.DEFAULT_IMAGE_CONFIG,
       ...(stored[CONFIG_KEY] || {})
-    };
-  }
-
-  function imageHostSettings(config) {
-    const quality = Number(config.compressionQuality);
-    const maxDimension = Number(config.maxDimension);
-    return {
-      enabled: config.enabled === true,
-      provider: config.provider || 'cloudflare-r2',
-      compressionEnabled: config.compressionEnabled !== false,
-      compressionQuality: Number.isFinite(quality) ? Math.min(0.95, Math.max(0.5, quality)) : 0.84,
-      maxDimension: Number.isFinite(maxDimension) ? Math.round(Math.min(8192, Math.max(512, maxDimension))) : 2560
     };
   }
 
@@ -168,7 +147,7 @@
     if (!message) return undefined;
     if (message.type === 'GET_IMAGE_HOST_SETTINGS') {
       loadConfig()
-        .then((config) => sendResponse({ ok: true, settings: imageHostSettings(config) }))
+        .then((config) => sendResponse({ ok: true, settings: globalThis.LinuxSbState.imageSettings(config) }))
         .catch((error) => sendResponse({ ok: false, error: error.message || '读取图床设置失败' }));
       return true;
     }

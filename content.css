@@ -8,22 +8,22 @@
   --lsa-danger: #b91c1c;
   position: relative;
   z-index: 5;
-  width: min(100%, 980px);
-  margin: 18px auto;
-  padding: 16px;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 10px auto;
+  padding: 10px 12px;
   border: 1px solid var(--lsa-line);
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--lsa-bg);
   color: var(--lsa-text);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
-  font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  box-shadow: none;
+  font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 #linux-sb-title-assistant * {
   box-sizing: border-box;
 }
 
-#linux-sb-title-assistant .lsa-header,
 #linux-sb-title-assistant .lsa-section-head,
 #linux-sb-title-assistant .lsa-actions,
 #linux-sb-title-assistant .lsa-confirm-actions {
@@ -32,34 +32,14 @@
   gap: 10px;
 }
 
-#linux-sb-title-assistant .lsa-header {
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-
 #linux-sb-title-assistant .lsa-title {
   font-size: 16px;
   font-weight: 700;
 }
 
-#linux-sb-title-assistant .lsa-subtitle,
 #linux-sb-title-assistant .lsa-muted,
 #linux-sb-title-assistant .lsa-empty {
   color: var(--lsa-muted);
-}
-
-#linux-sb-title-assistant .lsa-subtitle {
-  margin-top: 2px;
-  font-size: 12px;
-}
-
-#linux-sb-title-assistant .lsa-header-badge {
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: var(--lsa-brand-soft);
-  color: var(--lsa-brand);
-  font-size: 12px;
-  white-space: nowrap;
 }
 
 #linux-sb-title-assistant .lsa-metrics {
@@ -163,40 +143,6 @@
   color: #6b7280;
 }
 
-#linux-sb-title-assistant .lsa-forge-options,
-#linux-sb-title-assistant .lsa-forge-targets {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-#linux-sb-title-assistant .lsa-forge-exclusion-box {
-  margin-top: 12px;
-}
-
-#linux-sb-title-assistant .lsa-forge-exclusion-options {
-  display: grid;
-  gap: 8px;
-  margin: 7px 0 6px;
-  padding: 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 9px;
-  background: #fff;
-}
-
-#linux-sb-title-assistant .lsa-forge-exclusion-group {
-  display: grid;
-  gap: 5px;
-}
-
-#linux-sb-title-assistant .lsa-forge-exclusion-rarity {
-  color: var(--lsa-muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
 #linux-sb-title-assistant .lsa-forge-exclusion-items {
   display: flex;
   flex-wrap: wrap;
@@ -205,6 +151,10 @@
 
 #linux-sb-title-assistant .lsa-forge-exclusion-item {
   display: inline-flex;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: max-content;
+  white-space: nowrap;
   align-items: center;
   gap: 5px;
   padding: 4px 7px;
@@ -219,40 +169,6 @@
 #linux-sb-title-assistant .lsa-forge-exclusion-item input {
   margin: 0;
   accent-color: var(--lsa-brand);
-}
-
-#linux-sb-title-assistant .lsa-forge-targets {
-  display: block;
-}
-
-#linux-sb-title-assistant .lsa-forge-target-title {
-  margin-bottom: 6px;
-}
-
-#linux-sb-title-assistant .lsa-forge-target-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 18px;
-}
-
-#linux-sb-title-assistant .lsa-forge-target-group label {
-  flex: 0 0 auto;
-  min-width: max-content;
-  white-space: nowrap;
-}
-
-#linux-sb-title-assistant .lsa-forge-options label,
-#linux-sb-title-assistant .lsa-forge-targets label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--lsa-text);
-  font-size: 12px;
-}
-
-#linux-sb-title-assistant .lsa-forge-options input,
-#linux-sb-title-assistant .lsa-forge-targets input {
-  margin: 0;
 }
 
 #linux-sb-title-assistant .lsa-forge-preview {
@@ -271,10 +187,6 @@
   background: #fff;
   color: var(--lsa-text);
   font-weight: 600;
-}
-
-#linux-sb-title-assistant .lsa-forge-section > .lsa-primary {
-  width: 100%;
 }
 
 #linux-sb-title-assistant .lsa-section-title {
@@ -385,4 +297,44 @@
   #linux-sb-title-assistant .lsa-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+#linux-sb-title-assistant .lsa-toolbar,
+#linux-sb-title-assistant .lsa-forge-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+#linux-sb-title-assistant .lsa-toolbar .lsa-title { font-size: 13px; }
+#linux-sb-title-assistant .lsa-toolbar label {
+  display: inline-flex; flex: 0 0 auto; align-items: center; gap: 5px;
+  width: auto; min-width: max-content; margin: 0; white-space: nowrap; font: inherit;
+}
+#linux-sb-title-assistant input[type="checkbox"] {
+  appearance: auto; flex: 0 0 auto; width: 14px; height: 14px; margin: 0;
+  padding: 0; box-shadow: none; accent-color: var(--lsa-brand);
+}
+#linux-sb-title-assistant input[type="checkbox"]::before,
+#linux-sb-title-assistant input[type="checkbox"]::after { content: none; }
+#linux-sb-title-assistant .lsa-toolbar button { margin-left: auto; }
+#linux-sb-title-assistant .lsa-toolbar select {
+  color: inherit; background: var(--lsa-bg); border: 1px solid var(--lsa-line);
+  border-radius: 5px; padding: 3px 6px; font: inherit;
+}
+#linux-sb-title-assistant .lsa-inline-stat { color: var(--lsa-muted); font-variant-numeric: tabular-nums; }
+#linux-sb-title-assistant .lsa-details { margin-top: 6px; }
+#linux-sb-title-assistant summary { cursor: pointer; color: var(--lsa-muted); padding: 3px 0; font-size: 12px; }
+#linux-sb-title-assistant summary:hover { color: var(--lsa-brand); }
+#linux-sb-title-assistant .lsa-details-body { padding-top: 8px; }
+#linux-sb-title-assistant .lsa-details .lsa-section { margin-top: 8px; padding-top: 8px; }
+#linux-sb-title-assistant .lsa-details .lsa-list,
+#linux-sb-title-assistant .lsa-forge-exclusion-items { max-height: 180px; overflow-y: auto; }
+#linux-sb-title-assistant .lsa-forge-progress { margin-top: 8px; color: #92400e; }
+#linux-sb-title-assistant .lsa-forge-progress span { flex: 1; }
+#linux-sb-title-assistant :is(button, select, input, summary):focus-visible { outline: 2px solid var(--lsa-brand); outline-offset: 2px; }
+@media (max-width: 480px) {
+  #linux-sb-title-assistant { padding: 8px 10px; }
+  #linux-sb-title-assistant .lsa-toolbar { gap: 6px 10px; }
+  #linux-sb-title-assistant .lsa-history-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

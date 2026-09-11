@@ -25,9 +25,10 @@
           <span>隐藏右侧广告（默认关闭）</span>
         </label>
         <small class="setting-help">开启后仅隐藏论坛右侧的广告卡片，不影响帖子、版块列表和每日热帖。</small>
+        <p id="accountLabel" class="account-label"></p>
         <div class="button-row">
           <button class="primary" type="submit">保存设置</button>
-          <button id="clearHistory" type="button">清除本地统计</button>
+          <button id="clearHistory" type="button" disabled>清除该账号统计</button>
         </div>
         <div id="message" class="message" aria-live="polite"></div>
       </form>
@@ -44,13 +45,6 @@
           <label class="check-field image-toggle-field">
             <input id="imageHostEnabled" type="checkbox">
             <span>启用 Cloudflare R2 图片上传</span>
-          </label>
-          <label class="field">
-            <span>图床类型</span>
-            <select id="imageProvider">
-              <option value="cloudflare-r2">Cloudflare R2（公开直链）</option>
-            </select>
-            <small>图片会上传到第三方公共图床，返回的链接可直接用于论坛 Markdown。</small>
           </label>
           <label class="field">
             <span>Cloudflare 账户 ID</span>
@@ -76,6 +70,17 @@
             <small>需要已绑定到 Bucket 的自定义域名或 R2 公网地址。</small>
           </label>
           <label class="field">
+            <span>上传画质</span>
+            <select id="imagePreset">
+              <option value="recommended">推荐 · 兼顾清晰和体积</option>
+              <option value="high">高清 · 更大尺寸</option>
+              <option value="original">原图 · 不压缩</option>
+              <option value="custom">自定义</option>
+            </select>
+          </label>
+          <details id="imageAdvanced">
+            <summary>高级设置</summary>
+          <label class="field">
             <span>对象前缀（可选）</span>
             <input id="cloudflareObjectPrefix" type="text" autocomplete="off" spellcheck="false" value="linux-sb" placeholder="linux-sb">
           </label>
@@ -87,11 +92,7 @@
             </label>
             <label class="field compact-field">
               <span>压缩质量</span>
-              <select id="imageCompressionQuality">
-                <option value="0.8">80% · 更省空间</option>
-                <option value="0.84" selected>84% · 推荐</option>
-                <option value="0.9">90% · 更清晰</option>
-              </select>
+              <input id="imageCompressionQuality" type="number" min="0.5" max="0.95" step="0.01" value="0.84">
             </label>
             <label class="field compact-field">
               <span>最长边上限</span>
@@ -99,6 +100,7 @@
               <small>JPG、PNG、WebP 会转换为 WebP；GIF 动图和 SVG 保留原格式。</small>
             </label>
           </div>
+          </details>
           <div class="image-host-note">
             图片会以公开链接形式访问。压缩在浏览器本地完成，只有压缩后的图片才会上传；如果压缩结果反而变大，则自动保留原图。Access Key 和 Secret Access Key 属于敏感凭据，只保存在本地扩展设置中；不要在聊天中发送，也不要上传隐私图片。
           </div>
@@ -111,6 +113,7 @@
         </form>
       </section>
     </main>
+    <script src="lib/state.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

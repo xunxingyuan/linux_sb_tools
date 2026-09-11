@@ -1,18 +1,10 @@
 (function () {
   'use strict';
 
-  const STORAGE_KEY = 'linuxSbTitleAssistantState';
-  const IMAGE_CONFIG_KEY = 'linuxSbImageHostConfig';
-  const DEFAULT_STATE = {
-    version: 1,
-    updatedAt: '',
-    userId: '',
-    current: { points: null, pool: [], titles: [], inventory: [], ownedTypes: null, totalTypes: null },
-    historyRows: [],
-    forgeEvents: [],
-    settings: { reservePoints: 0, confirmEachDraw: true, adRemovalEnabled: false },
-    pendingDraw: null
-  };
+  const store = globalThis.LinuxSbState;
+  const IMAGE_CONFIG_KEY = store.IMAGE_CONFIG_KEY;
+  let displayedUserId = '';
+  let displayedSettings = {};
 
   const form = document.getElementById('settingsForm');
   const reserve = document.getElementById('reservePoints');
@@ -21,7 +13,7 @@
   const message = document.getElementById('message');
   const imageHostForm = document.getElementById('imageHostForm');
   const imageHostEnabled = document.getElementById('imageHostEnabled');
-  const imageProvider = document.getElementById('imageProvider');
+  const imagePreset = document.getElementById('imagePreset');
   const cloudflareAccountId = document.getElementById('cloudflareAccountId');
   const cloudflareBucket = document.getElementById('cloudflareBucket');
   const cloudflareAccessKeyId = document.getElementById('cloudflareAccessKeyId');
@@ -38,40 +30,11 @@
     return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
   }
 
-  function mergedState(saved) {
-    return {
-      ...DEFAULT_STATE,
-      ...(saved || {}),
-      current: { ...DEFAULT_STATE.current, ...((saved && saved.current) || {}) },
-      settings: { ...DEFAULT_STATE.settings, ...((saved && saved.settings) || {}) }
-    };
-  }
-
-  async function readState() {
-    const value = await chrome.storage.local.get(STORAGE_KEY);
-    return mergedState(value[STORAGE_KEY]);
-  }
-
-  async function writeState(state) {
-    await chrome.storage.local.set({ [STORAGE_KEY]: state });
-  }
+  async function readState() { return store.request('GET'); }
 
   async function readImageConfig() {
     const value = await chrome.storage.local.get(IMAGE_CONFIG_KEY);
-    return {
-      enabled: false,
-      provider: 'cloudflare-r2',
-      accountId: '',
-      bucket: '',
-      accessKeyId: '',
-      secretAccessKey: '',
-      publicBaseUrl: '',
-      objectPrefix: 'linux-sb',
-      compressionEnabled: true,
-      compressionQuality: 0.84,
-      maxDimension: 2560,
-      ...(value[IMAGE_CONFIG_KEY] || {})
-    };
+    return { ...store.DEFAULT_IMAGE_CONFIG, ...value[IMAGE_CONFIG_KEY] };
   }
 
   async function writeImageConfig(config) {
@@ -97,31 +60,41 @@
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const state = await readState();
-    state.settings = {
-      ...state.settings,
-      reservePoints: Math.max(0, Number(reserve.value) || 0),
-      confirmEachDraw: confirmEachDraw.checked,
-      adRemovalEnabled: adRemovalEnabled.checked
-    };
-    await writeState(state);
-    message.textContent = '设置已保存。';
+    try {
+      const values = {
+        reservePoints: Math.max(0, Number(reserve.value) || 0),
+        confirmEachDraw: confirmEachDraw.checked,
+        adRemovalEnabled: adRemovalEnabled.checked
+      };
+      const patch = Object.fromEntries(Object.entries(values).filter(([key, value]) => value !== displayedSettings[key]));
+      const saved = await store.request('SETTINGS', { patch });
+      displayedSettings = { ...saved.settings };
+      reserve.value = String(saved.settings.reservePoints);
+      confirmEachDraw.checked = saved.settings.confirmEachDraw;
+      adRemovalEnabled.checked = saved.settings.adRemovalEnabled;
+      message.textContent = '设置已保存。';
+    } catch (error) { message.textContent = error.message; }
   });
 
   document.getElementById('clearHistory').addEventListener('click', async () => {
-    const state = await readState();
-    state.historyRows = [];
-    state.forgeEvents = [];
-    state.updatedAt = new Date().toISOString();
-    await writeState(state);
-    message.textContent = '本地历史统计已清除；当前库存和积分快照保留。';
+    try {
+      await store.request('CLEAR_HISTORY', { userId: displayedUserId });
+      message.textContent = `账号 ${displayedUserId} 的本地历史已清除；库存和积分快照保留。`;
+    } catch (error) { message.textContent = error.message; }
   });
 
   imageHostForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const currentConfig = await readImageConfig();
-    await writeImageConfig(collectImageConfig(currentConfig));
-    imageHostMessage.textContent = imageHostEnabled.checked ? '图床助手已启用。刷新发帖页后生效。' : '图床助手已关闭。';
+    try {
+      const config = collectImageConfig(currentConfig);
+      if (config.enabled) {
+        if (![config.accountId, config.bucket, config.accessKeyId, config.secretAccessKey].every(Boolean)) throw new Error('请填写账户 ID、Bucket 和访问凭据');
+        if (new URL(config.publicBaseUrl).protocol !== 'https:') throw new Error('公开访问地址需要使用 HTTPS');
+      }
+      await writeImageConfig(config);
+      imageHostMessage.textContent = config.enabled ? '图床助手已启用。' : '图床助手已关闭。';
+    } catch (error) { imageHostMessage.textContent = error.message; }
   });
 
   document.getElementById('disableImageHost').addEventListener('click', async () => {
@@ -142,28 +115,36 @@
     imageCompressionEnabled.checked = true;
     imageCompressionQuality.value = '0.84';
     imageMaxDimension.value = '2560';
-    await writeImageConfig({
-      enabled: false,
-      provider: 'cloudflare-r2',
-      accountId: '',
-      bucket: '',
-      accessKeyId: '',
-      secretAccessKey: '',
-      publicBaseUrl: '',
-      objectPrefix: 'linux-sb',
-      compressionEnabled: true,
-      compressionQuality: 0.84,
-      maxDimension: 2560
-    });
+    imagePreset.value = 'recommended';
+    await writeImageConfig({ ...store.DEFAULT_IMAGE_CONFIG });
     imageHostMessage.textContent = 'Cloudflare R2 凭据已清除，图床助手已关闭。';
   });
 
+  function syncPreset() {
+    imagePreset.value = !imageCompressionEnabled.checked ? 'original'
+      : Number(imageCompressionQuality.value) === 0.84 && Number(imageMaxDimension.value) === 2560 ? 'recommended'
+      : Number(imageCompressionQuality.value) === 0.9 && Number(imageMaxDimension.value) === 4096 ? 'high' : 'custom';
+  }
+  imagePreset.addEventListener('change', () => {
+    const preset = imagePreset.value;
+    if (preset === 'custom') { document.getElementById('imageAdvanced').open = true; return; }
+    imageCompressionEnabled.checked = preset !== 'original';
+    if (preset !== 'original') {
+      imageCompressionQuality.value = preset === 'high' ? '0.9' : '0.84';
+      imageMaxDimension.value = preset === 'high' ? '4096' : '2560';
+    }
+  });
+  [imageCompressionEnabled, imageCompressionQuality, imageMaxDimension].forEach(input => input.addEventListener('change', syncPreset));
+
   Promise.all([readState(), readImageConfig()]).then(([state, imageConfig]) => {
+    displayedSettings = { ...state.settings };
     reserve.value = String(state.settings.reservePoints || 0);
     confirmEachDraw.checked = state.settings.confirmEachDraw !== false;
     adRemovalEnabled.checked = state.settings.adRemovalEnabled === true;
     imageHostEnabled.checked = imageConfig.enabled === true;
-    imageProvider.value = 'cloudflare-r2';
+    displayedUserId = state.userId;
+    document.getElementById('clearHistory').disabled = !state.userId;
+    document.getElementById('accountLabel').textContent = state.userId ? `当前统计账号：${state.userId}` : '请先在称号页面确认账号';
     cloudflareAccountId.value = imageConfig.accountId || '';
     cloudflareBucket.value = imageConfig.bucket || '';
     cloudflareAccessKeyId.value = imageConfig.accessKeyId || '';
@@ -173,6 +154,7 @@
     imageCompressionEnabled.checked = imageConfig.compressionEnabled !== false;
     imageCompressionQuality.value = String(clamp(imageConfig.compressionQuality, 0.5, 0.95, 0.84));
     imageMaxDimension.value = String(Math.round(clamp(imageConfig.maxDimension, 512, 8192, 2560)));
+    syncPreset();
   }).catch(() => {
     message.textContent = '读取设置失败。';
   });

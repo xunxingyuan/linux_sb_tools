@@ -169,6 +169,30 @@ function captureDrawSubmissions(dom) {
   return submissions;
 }
 
+test('daily free draw at zero balance bypasses reserve but preserves confirmation and the free submitter', async t => {
+  const ext = extension();
+  await ext.request('SETTINGS', { patch: { reservePoints: 100 } });
+  const html = gacha('1', 0).replace('<button data-cost="10">单抽</button>',
+    '<button name="mode" value="free">今日免费一抽</button><button name="mode" value="single">抽一次（10 积分）</button>');
+  const dom = await pageFor(ext, html, '/gacha', async url => ({ ok: true,
+    text: async () => String(url).includes('gacha_profile') ? profile() : html }));
+  t.after(dom.close);
+  const submissions = captureDrawSubmissions(dom);
+  const free = dom.document.querySelector('[value="free"]');
+  clickDraw(dom, free);
+  await tick();
+  assert.match(dom.document.querySelector('.lsa-confirm')?.textContent || '', /消耗 0 积分/);
+  assert.equal(submissions.length, 0);
+  dom.document.querySelector('.lsa-confirm .lsa-primary').click();
+  await tick();
+  assert.equal(submissions.length, 1);
+  assert.equal(submissions[0].submitter, free);
+  clickDraw(dom, dom.document.querySelector('[value="single"]'));
+  await tick();
+  assert.match(dom.document.querySelector('[role="alert"]').textContent, /积分不足/);
+  assert.equal(submissions.length, 1);
+});
+
 test('new installation can confirm a draw while inventory is unavailable without syncing history', async t => {
   const ext = extension();
   const fetched = [];

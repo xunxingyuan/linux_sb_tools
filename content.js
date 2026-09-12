@@ -567,7 +567,7 @@
       if (action.button.matches(':disabled')) throw new Error('站点暂不允许本次抽取，请刷新页面后重试。');
       const reserve = Math.max(0, Number(state.settings.reservePoints) || 0);
       if (points < action.cost) throw new Error(`积分不足：当前 ${formatNumber(points)} 分，本次需要 ${formatNumber(action.cost)} 分。`);
-      if (points - action.cost < reserve) {
+      if (action.cost > 0 && points - action.cost < reserve) {
         throw new Error(`余额保护已阻止本次操作：当前 ${formatNumber(points)} 分，本次消耗 ${formatNumber(action.cost)} 分，需至少保留 ${formatNumber(reserve)} 分。`);
       }
       panel?.querySelector('.lsa-notice')?.remove();

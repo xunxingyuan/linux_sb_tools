@@ -26,7 +26,9 @@ test('unknown, contradictory and invalid draw fees cannot silently use a default
   for (const markup of [
     '<button>十连抽</button>', '<button data-cost="no-price">百连抽</button>',
     '<button data-cost="10">十连抽（90 积分）</button>',
-    '<button>抽一次（0 积分）</button>', '<button>抽一次（-10 积分）</button>',
+    '<button data-cost="">抽一次</button>', '<button>抽一次（-10 积分）</button>',
+    '<button data-cost="10">今日免费一抽</button>',
+    '<button data-cost="0">抽一次（10 积分）</button>',
     '<button>抽一次（10 积分 / 20 积分）</button>'
   ]) {
     const dom = new JSDOM(`<form>${markup}</form>`);
@@ -40,4 +42,16 @@ test('unknown, contradictory and invalid draw fees cannot silently use a default
     assert.equal(parser.parseDrawAction(second).cost, 1200, 'Use the published price, not a hardcoded hundred-draw cost');
     assert.equal(parser.parseDrawAction(first, second.querySelector('button')), null);
   } finally { dom.window.close(); }
+});
+
+test('explicit free draws and zero fees are recognized without treating missing fees as free', () => {
+  for (const markup of [
+    '<button>今日免费一抽</button>', '<button>每日免费一抽</button>',
+    '<button>免费一抽（0 积分）</button>', '<button data-cost="0">今日免费一抽</button>',
+    '<button data-cost="0">抽一次</button>', '<button>抽一次（0 积分）</button>'
+  ]) {
+    const dom = new JSDOM(`<form>${markup}</form>`);
+    try { assert.equal(parser.parseDrawAction(dom.window.document.querySelector('form'))?.cost, 0, markup); }
+    finally { dom.window.close(); }
+  }
 });

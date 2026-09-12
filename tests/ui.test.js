@@ -134,3 +134,169 @@ test('update crawls dynamically discovered pages; failed notification sync keeps
   assert.deepEqual(result.forgeEvents, [oldEvent]);
   assert.match(dom.document.querySelector('[role="alert"]').textContent, /部分更新未完成/);
 });
+
+test('draw confirmation works after update when the button shows its price without data-cost', async t => {
+  const ext = extension();
+  const html = gacha().replace('<button data-cost="10">单抽</button>', '<button name="mode" value="ten">十连抽（<span>90</span> 积分）</button>');
+  const dom = await pageFor(ext, html, '/gacha', async url => ({ ok: true, text: async () => {
+    if (String(url).includes('gacha_profile')) return profile();
+    if (String(url).includes('/user/')) return `${accountBar('1')}<main>暂无记录</main>`;
+    return html;
+  } }));
+  t.after(dom.close);
+  dom.document.querySelector('[data-update]').click();
+  await tick(); await tick();
+  assert.match(dom.document.querySelector('.lsa-notice').textContent, /数据已更新/);
+  const button = dom.document.querySelector('.gacha-actions button');
+  button.form.dispatchEvent(new dom.window.SubmitEvent('submit', { cancelable: true, submitter: button }));
+  await tick();
+  assert.match(dom.document.querySelector('.lsa-confirm')?.textContent || '', /90 积分/);
+  assert.equal(dom.document.querySelector('[role="alert"]'), null);
+});
+
+function clickDraw(dom, button = dom.document.querySelector('.gacha-actions button')) {
+  const event = new dom.window.SubmitEvent('submit', { cancelable: true, submitter: button });
+  button.form.dispatchEvent(event);
+  assert.equal(event.defaultPrevented, true, 'Native submission waits for validation');
+}
+
+function captureDrawSubmissions(dom) {
+  const submissions = [];
+  dom.window.HTMLFormElement.prototype.requestSubmit = function (submitter) {
+    const event = new dom.window.SubmitEvent('submit', { cancelable: true, submitter });
+    if (this.dispatchEvent(event)) submissions.push({ form: this, submitter });
+  };
+  return submissions;
+}
+
+test('new installation can confirm a draw while inventory is unavailable without syncing history', async t => {
+  const ext = extension();
+  const fetched = [];
+  const dom = await pageFor(ext, gacha(), '/gacha', async url => {
+    fetched.push(String(url));
+    if (String(url).includes('gacha_profile')) throw new Error('库存暂时离线');
+    return { ok: true, text: async () => gacha() };
+  });
+  t.after(dom.close);
+  assert.equal((await ext.request('GET', { userId: '1' })).current.points, null);
+  clickDraw(dom);
+  await tick();
+  assert.match(dom.document.querySelector('.lsa-confirm').textContent, /10 积分/);
+  assert.equal((await ext.request('GET', { userId: '1' })).current.points, 903);
+  assert.deepEqual(fetched, ['/gacha', '/gacha_profile', '/gacha']);
+});
+
+test('draw confirmation preserves the chosen ten-draw submitter and submits once', async t => {
+  const ext = extension();
+  const html = gacha().replace('<button data-cost="10">单抽</button>',
+    '<button name="mode" value="single">抽一次 (10 积分)</button><button name="mode" value="ten">十连抽 (90 积分)</button>');
+  const dom = await pageFor(ext, html);
+  t.after(dom.close);
+  const submissions = captureDrawSubmissions(dom);
+  const ten = dom.document.querySelector('[value="ten"]');
+  clickDraw(dom, ten);
+  clickDraw(dom, ten);
+  await tick();
+  assert.equal(submissions.length, 0);
+  assert.equal(dom.document.querySelectorAll('.lsa-confirm').length, 1);
+  assert.match(dom.document.querySelector('.lsa-confirm').textContent, /90 积分/);
+  dom.document.querySelector('.lsa-confirm .lsa-primary').click();
+  await tick();
+  assert.equal(submissions.length, 1);
+  assert.equal(submissions[0].submitter, ten);
+  assert.equal(submissions[0].form, ten.form);
+});
+
+test('draw guard uses fresh balance and rechecks changed reserve on confirmation', async t => {
+  const ext = extension();
+  let points = 903;
+  const dom = await pageFor(ext, gacha(), '/gacha', async url => ({ ok: true,
+    text: async () => String(url).includes('gacha_profile') ? profile() : gacha('1', points) }));
+  t.after(dom.close);
+  const submissions = captureDrawSubmissions(dom);
+  points = 5;
+  clickDraw(dom);
+  await tick();
+  assert.match(dom.document.querySelector('[role="alert"]').textContent, /积分不足/);
+  assert.equal(dom.document.querySelector('.lsa-confirm'), null);
+  points = 100;
+  clickDraw(dom);
+  await tick();
+  assert.ok(dom.document.querySelector('.lsa-confirm'));
+  await ext.request('SETTINGS', { patch: { reservePoints: 95 } });
+  dom.document.querySelector('.lsa-confirm .lsa-primary').click();
+  await tick();
+  assert.match(dom.document.querySelector('[role="alert"]').textContent, /余额保护/);
+  assert.equal(submissions.length, 0);
+});
+
+test('draw guard reports account, balance and price failures separately and never submits', async t => {
+  for (const kind of ['account', 'balance', 'price', 'network']) {
+    await t.test(kind, async t => {
+      const ext = extension();
+      const dom = await pageFor(ext, gacha());
+      t.after(dom.close);
+      const submissions = captureDrawSubmissions(dom);
+      let expected;
+      if (kind === 'price') {
+        dom.document.querySelector('.gacha-actions button').removeAttribute('data-cost');
+        expected = /抽取费用/;
+      } else if (kind === 'account') {
+        dom.document.querySelector('.bar-right').remove();
+        expected = /登录账号/;
+      } else if (kind === 'balance') {
+        dom.window.fetch = async () => ({ ok: true, text: async () => accountBar('1') + '<main>称号抽取</main>' });
+        expected = /积分余额/;
+      } else {
+        dom.window.fetch = async () => { throw new Error('网络暂时不可用'); };
+        expected = /网络暂时不可用/;
+      }
+      clickDraw(dom);
+      await tick();
+      assert.match(dom.document.querySelector('[role="alert"]').textContent, expected);
+      assert.equal(submissions.length, 0);
+    });
+  }
+});
+
+test('account changes invalidate draw confirmation and retain the original account data', async t => {
+  const ext = extension();
+  const dom = await pageFor(ext, gacha());
+  t.after(dom.close);
+  const submissions = captureDrawSubmissions(dom);
+  clickDraw(dom);
+  await tick();
+  dom.window.fetch = async () => ({ ok: true, text: async () => gacha('2', 9999) });
+  dom.document.querySelector('.lsa-confirm .lsa-primary').click();
+  await tick();
+  assert.equal(submissions.length, 0);
+  assert.match(dom.document.querySelector('[role="alert"]').textContent, /账号已变化/);
+  assert.equal((await ext.request('GET', { userId: '1' })).current.points, 903);
+  assert.equal((await ext.request('GET', { userId: '2' })).current.points, null);
+});
+
+test('cancel during final draw validation prevents submission; confirmation-off still validates balance', async t => {
+  const ext = extension();
+  const dom = await pageFor(ext, gacha());
+  t.after(dom.close);
+  const submissions = captureDrawSubmissions(dom);
+  clickDraw(dom);
+  await tick();
+  let finishFetch;
+  dom.window.fetch = () => new Promise(resolve => { finishFetch = resolve; });
+  dom.document.querySelector('.lsa-confirm .lsa-primary').click();
+  await tick();
+  dom.document.querySelector('.lsa-confirm button').click();
+  finishFetch({ ok: true, text: async () => gacha() });
+  await tick();
+  assert.equal(submissions.length, 0);
+  await ext.request('SETTINGS', { patch: { confirmEachDraw: false } });
+  dom.window.fetch = async () => ({ ok: true, text: async () => gacha('1', 0) });
+  clickDraw(dom);
+  await tick();
+  assert.equal(submissions.length, 0);
+  dom.window.fetch = async () => ({ ok: true, text: async () => gacha() });
+  clickDraw(dom);
+  await tick();
+  assert.equal(submissions.length, 1);
+});

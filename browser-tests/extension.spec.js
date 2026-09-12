@@ -179,3 +179,44 @@ test('second tab never executes another tab task; stopping countdown prevents su
   await app.page.waitForTimeout(3300);
   expect(app.submits).toEqual([]);
 });
+
+test('draw after successful update reads the visible fee and preserves the submitted draw mode', async ({ app }) => {
+  const submitted = [];
+  const html = gacha().replace('<button data-cost="10">单抽</button>',
+    '<button name="mode" value="single">抽一次（10 积分）</button><button name="mode" value="ten">十连抽（<span>90</span> 积分）</button>');
+  await app.context.route('https://linux.sb/gacha', route => {
+    if (route.request().method() === 'POST') submitted.push(new URLSearchParams(route.request().postData()).get('mode'));
+    return route.fulfill({ contentType: 'text/html', body: wrap(html) });
+  });
+  await app.page.goto('https://linux.sb/gacha');
+  const panel = app.page.locator('#linux-sb-title-assistant');
+  await expect(panel.locator('.lsa-inline-stat').first()).toHaveText('积分 903');
+  await panel.getByRole('button', { name: '更新数据', exact: true }).click();
+  await expect(panel.locator('.lsa-notice')).toHaveText('数据已更新。');
+  await app.page.locator('.gacha-actions [value="ten"]').click();
+  await expect(panel.locator('.lsa-confirm')).toContainText('90 积分');
+  expect(submitted).toEqual([]);
+  await panel.getByRole('button', { name: '确认抽取', exact: true }).click();
+  await expect.poll(() => submitted).toEqual(['ten']);
+  expect(app.errors).toEqual([]);
+});
+
+test('draw from a clean installation checks balance independently of inventory availability', async ({ app }) => {
+  let points = 903;
+  const submitted = [];
+  await app.context.route('https://linux.sb/gacha_profile', route => route.fulfill({ status: 503, body: 'Offline inventory' }));
+  await app.context.route('https://linux.sb/gacha', route => {
+    if (route.request().method() === 'POST') submitted.push(route.request().postData());
+    return route.fulfill({ contentType: 'text/html', body: wrap(gacha('1', points).replace('<button data-cost="10">单抽</button>', '<button>抽一次（10 积分）</button>')) });
+  });
+  await app.page.goto('https://linux.sb/gacha');
+  const panel = app.page.locator('#linux-sb-title-assistant');
+  await expect(panel.getByRole('alert')).toContainText('503');
+  await app.page.locator('.gacha-actions button').click();
+  await expect(panel.locator('.lsa-confirm')).toContainText('10 积分');
+  points = 5;
+  await panel.getByRole('button', { name: '确认抽取', exact: true }).click();
+  await expect(panel.getByRole('alert')).toContainText('积分不足');
+  expect(submitted).toEqual([]);
+  expect(app.errors).toEqual([]);
+});

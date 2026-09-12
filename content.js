@@ -13,7 +13,8 @@
 
   let state = null;
   let panel = null;
-  let allowedForm = null;
+  let approvedDraw = null;
+  let drawCheckPending = false;
   let updatePromise = null;
   let forgeRunning = false;
   let forgeTask = null;
@@ -514,8 +515,9 @@
     if (current) current.remove();
   }
 
-  function showDrawConfirm(form, cost, modeLabel) {
+  function showDrawConfirm(form, action, userId) {
     clearConfirm();
+    const { cost, label: modeLabel } = action;
     const confirm = element('div', 'lsa-confirm');
     confirm.append(element('div', 'lsa-confirm-text', `确认${modeLabel}？本次将消耗 ${formatNumber(cost)} 积分。`));
     const hint = element('div', 'lsa-muted', '普通抽取只保留积分统计，余额保护仍然生效。');
@@ -523,17 +525,69 @@
     const actions = element('div', 'lsa-confirm-actions');
     const cancel = element('button', 'lsa-small-button', '取消');
     const submit = element('button', 'lsa-small-button lsa-primary', '确认抽取');
+    cancel.type = submit.type = 'button';
     cancel.addEventListener('click', clearConfirm);
     submit.addEventListener('click', () => {
       submit.disabled = true;
-      allowedForm = form;
-      clearConfirm();
-      if (typeof form.requestSubmit === 'function') form.requestSubmit();
-      else form.submit();
+      prepareDraw(form, action.button, { userId, cost, dialog: confirm }).finally(() => { submit.disabled = false; });
     });
     actions.append(cancel, submit);
     confirm.append(actions);
     panel.append(confirm);
+  }
+
+  async function prepareDraw(form, submitter, confirmed) {
+    if (drawCheckPending) return;
+    drawCheckPending = true;
+    try {
+      const action = parser.parseDrawAction(form, submitter);
+      if (!action) throw new Error('未识别到本次抽取费用，请刷新论坛页面后重试；如果仍出现，请反馈抽取按钮上的费用文字。');
+      if (!form.isConnected || action.button.matches(':disabled')) throw new Error('站点暂不允许本次抽取，请刷新页面后重试。');
+      const userId = await requireAccount();
+      if (confirmed && (confirmed.userId !== userId || confirmed.cost !== action.cost)) {
+        clearConfirm();
+        throw new Error('账号或抽取费用已变化，请重新点击抽取并确认。');
+      }
+      showNotice('正在核对当前账号和积分…');
+      // Draw eligibility only needs a fresh balance; inventory/history requests
+      // must not leave a newly installed extension with a permanently null balance.
+      const doc = await fetchDocument('/gacha');
+      if (parser.findUserId(doc) !== userId || parser.findUserId(document) !== userId) {
+        throw new Error('登录账号已变化，请刷新论坛页面后重新抽取。');
+      }
+      const points = parser.parseGachaPage(doc)?.points;
+      if (!Number.isFinite(points)) throw new Error('未识别到当前积分余额，请刷新论坛页面后重试。');
+      state = await store.request('CURRENT', { userId, current: { points } });
+      if (confirmed && !confirmed.dialog.isConnected) return;
+      const latest = parser.parseDrawAction(form, action.button);
+      if (parser.findUserId(document) !== userId || !form.isConnected || !latest || latest.cost !== action.cost) {
+        clearConfirm();
+        throw new Error('账号或抽取按钮已变化，请刷新论坛页面后重试。');
+      }
+      if (action.button.matches(':disabled')) throw new Error('站点暂不允许本次抽取，请刷新页面后重试。');
+      const reserve = Math.max(0, Number(state.settings.reservePoints) || 0);
+      if (points < action.cost) throw new Error(`积分不足：当前 ${formatNumber(points)} 分，本次需要 ${formatNumber(action.cost)} 分。`);
+      if (points - action.cost < reserve) {
+        throw new Error(`余额保护已阻止本次操作：当前 ${formatNumber(points)} 分，本次消耗 ${formatNumber(action.cost)} 分，需至少保留 ${formatNumber(reserve)} 分。`);
+      }
+      panel?.querySelector('.lsa-notice')?.remove();
+      if (!confirmed && state.settings.confirmEachDraw) {
+        showDrawConfirm(form, action, userId);
+        return;
+      }
+      clearConfirm();
+      approvedDraw = { form, button: action.button, userId, cost: action.cost };
+      try {
+        // Preserve the clicked submitter's name/value (single/ten/hundred).
+        HTMLFormElement.prototype.requestSubmit.call(form, action.button);
+      } finally {
+        approvedDraw = null;
+      }
+    } catch (error) {
+      showNotice(error.message || '暂时无法核对抽取信息，请稍后重试。', 'error');
+    } finally {
+      drawCheckPending = false;
+    }
   }
 
   function attachDrawGuards() {
@@ -541,29 +595,18 @@
       if (form.dataset.lsaGuardAttached === '1') return;
       form.dataset.lsaGuardAttached = '1';
       form.addEventListener('submit', (event) => {
-        const button = form.querySelector('button[data-cost]');
-        const cost = Number(button && button.dataset.cost) || 0;
-        const modeLabel = button ? button.textContent.replace(/\s*\(.*/, '').trim() : '抽取';
-
-        const reserve = Math.max(0, Number(state.settings.reservePoints || 0));
-        if (!parser.findUserId(document) || !Number.isFinite(state.current.points) || !cost) {
+        if (approvedDraw?.form === form) {
+          const approval = approvedDraw;
+          approvedDraw = null;
+          const action = parser.parseDrawAction(form, event.submitter);
+          if (action?.button === approval.button && action.cost === approval.cost
+            && parser.findUserId(document) === approval.userId) return;
           event.preventDefault();
-          allowedForm = null;
-          showNotice('未确认账号、余额或抽取费用，请更新数据后再试。', 'error');
+          showNotice('抽取信息已变化，请重新点击抽取并确认。', 'error');
           return;
         }
-        if (state.current.points - cost < reserve) {
-          allowedForm = null;
-          event.preventDefault();
-          showNotice(`余额保护已阻止本次操作：至少保留 ${formatNumber(reserve)} 积分。`, 'error');
-          return;
-        }
-
-        if (allowedForm === form) { allowedForm = null; return; }
-        if (state.settings.confirmEachDraw) {
-          event.preventDefault();
-          showDrawConfirm(form, cost, modeLabel);
-        }
+        event.preventDefault();
+        void prepareDraw(form, event.submitter);
       });
     });
   }
@@ -786,7 +829,7 @@
     if (isGachaPage) attachDrawGuards();
     try {
       await refreshCurrentData();
-      render();
+      if (!panel.querySelector('.lsa-confirm')) render();
       if (isForgePage) await resumeForgeChain();
     } catch (error) {
       showNotice(error.message, 'error');

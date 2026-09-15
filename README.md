@@ -1,6 +1,6 @@
 # LINUX SB 扩展工具箱
 
-Chrome Manifest V3 扩展，提供称号统计、分阶段熔铸、Cloudflare R2 图片上传和可选广告隐藏。当前版本：**0.10.2**。运行时使用原生 JavaScript，不需要构建。
+Chrome Manifest V3 扩展，提供称号统计、分阶段熔铸、Cloudflare R2 图片上传和可选广告隐藏。当前版本：**0.10.3**。运行时使用原生 JavaScript，不需要构建。
 
 ## 精简后的页面
 

@@ -4,6 +4,7 @@ const vm = require('node:vm');
 const crypto = require('node:crypto');
 const { JSDOM } = require('jsdom');
 const market = require('../lib/market');
+const manifestVersion = require('../manifest.json').version;
 const root = path.resolve(__dirname, '..');
 const source = file => fs.readFileSync(path.join(root, file), 'utf8');
 const clone = value => value === undefined ? undefined : structuredClone(value);
@@ -47,13 +48,13 @@ function extension(initial = {}) {
             config: market.normalizeConfig(data[market.CONFIG_KEY]),
             runtime: { accountId: '', lastCheckedAt: '', lastError: '', matches: [], ...clone(data[market.RUNTIME_KEY]) }
           } };
-          if (['UPDATE_GET', 'UPDATE_CHECK'].includes(message.type)) return { ok: true, status: {
-            localVersion: '0.12.1', remoteVersion: '0.12.1', available: false, error: ''
+          if (['UPDATE_GET', 'UPDATE_CHECK'].includes(message.type)) return { ok: true, status: clone(data.linuxSbUpdateStatus) || {
+            localVersion: manifestVersion, remoteVersion: manifestVersion, available: false, error: ''
           } };
           try { return { ok: true, result: await request(message.action, message, tabId) }; }
           catch (error) { return { ok: false, error: error.message }; }
         },
-        onMessage: { addListener() {} }, openOptionsPage() {}, reload() {}
+        onMessage: { addListener() {} }, openOptionsPage() {}, reload() { instance.window.__reloadCount = (instance.window.__reloadCount || 0) + 1; }
       },
       tabs: { query: async () => [{ id: tabId }], create() {} }
     };

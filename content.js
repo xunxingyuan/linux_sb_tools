@@ -448,7 +448,8 @@
     const extra = details('forge-options', `排除 ${excluded.size} 项 · 查看预估`, body => {
       const list = element('div', 'lsa-forge-exclusion-items');
       const titles = new Map(state.current.titles.filter(item => ['N', 'R', 'SR'].includes(item.rarity)).map(item => [item.name, item]));
-      for (const name of excluded) if (!titles.has(name)) titles.set(name, { name, rarity: '' });
+      const fallbackRarity = { '路人甲': 'N', '反贼': 'R', '键盘侠': 'SR' };
+      for (const name of excluded) if (!titles.has(name)) titles.set(name, { name, rarity: fallbackRarity[name] || '' });
       for (const item of titles.values()) {
         const label = element('label', 'lsa-forge-exclusion-item');
         const input = element('input');

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LINUX SB 扩展工具箱",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "description": "LINUX SB 扩展工具箱，提供称号统计、熔铸助手和市场价格提醒。",
   "permissions": [
     "storage",

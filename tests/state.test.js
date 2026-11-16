@@ -11,12 +11,23 @@ test('retired ad setting is excluded from snapshots', () => {
   assert.equal(state.snapshot(root).settings.reservePoints, 100);
 });
 
+test('new forge default excludes SR 键盘侠 and upgrades the old default once', async () => {
+  assert.deepEqual(state.normalize().settings.forgeExcludedNames, ['路人甲', '反贼', '键盘侠']);
+  const ext = extension({ [key]: { version: 2, settings: { forgeExcludedNames: ['路人甲', '反贼'] }, accounts: {} } });
+  assert.deepEqual((await ext.request('GET')).settings.forgeExcludedNames, ['路人甲', '反贼', '键盘侠']);
+  assert.equal(ext.data[key].forgeDefaultsVersion, 2);
+  await ext.request('SETTINGS', { patch: { forgeExcludedNames: ['路人甲', '反贼'] } });
+  assert.deepEqual((await ext.request('GET')).settings.forgeExcludedNames, ['路人甲', '反贼']);
+  const customized = state.normalize({ version: 2, settings: { forgeExcludedNames: ['萌新'] }, accounts: {} });
+  assert.deepEqual(customized.settings.forgeExcludedNames, ['萌新', '键盘侠']);
+});
+
 test('migration preserves identified history and quarantines unknown legacy data', async () => {
   const old = { userId: '1', current: { points: 50 }, historyRows: [{ time: 't', reason: '抽卡', change: -10 }], settings: { forgeExcludedNames: ['路人甲'] } };
   const ext = extension({ [key]: old, pendingForgeChain: { stageIndex: 1 } });
   const migrated = await ext.request('GET');
   assert.equal(migrated.current.points, 50);
-  assert.deepEqual(migrated.settings.forgeExcludedNames, ['路人甲']);
+  assert.deepEqual(migrated.settings.forgeExcludedNames, ['路人甲', '键盘侠']);
   assert.equal(ext.data.pendingForgeChain, undefined);
   assert.equal((await ext.request('GET', { userId: '2' })).historyRows.length, 0);
   const unknown = state.normalize({ ...old, userId: '' });

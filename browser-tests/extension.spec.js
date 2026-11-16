@@ -4,6 +4,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { gacha, profile, accountBar } = require('../test-support/extension');
 const root = path.resolve(__dirname, '..');
+const localVersion = require('../manifest.json').version;
+const nextVersion = localVersion.replace(/\d+$/, value => String(Number(value) + 1));
 const titleStateKey = 'linuxSbTitleAssistantState';
 const startInventory = [
   { name: '萌新', rarity: 'N', count: 28 }, { name: '常客', rarity: 'R', count: 5 },
@@ -31,7 +33,7 @@ const test = base.extend({
     fs.writeFileSync(path.join(extensionDir, 'update-test-fetch.js'), `const originalFetch = globalThis.fetch; globalThis.fetch = async (url, options) => {
       if (String(url).startsWith('https://raw.githubusercontent.com/xunxingyuan/linux_sb_tools/')) {
         const data = await chrome.storage.local.get('linuxSbTestRemoteVersion');
-        return { ok: true, json: async () => ({ version: data.linuxSbTestRemoteVersion || '0.12.1' }) };
+        return { ok: true, json: async () => ({ version: data.linuxSbTestRemoteVersion || ${JSON.stringify(localVersion)} }) };
       }
       return originalFetch(url, options);
     };`);
@@ -131,6 +133,9 @@ test('compact panels fit desktop/mobile and settings changes preserve controls',
   await panel.screenshot({ path: path.join(root, 'docs/screenshots/compact-forge.png') });
   await panel.locator('summary').click();
   await expect(panel.locator('.lsa-forge-preview')).toContainText('理论上限');
+  const keyboard = panel.locator('.lsa-forge-exclusion-item input[value="键盘侠"]');
+  await expect(keyboard).toBeChecked();
+  await expect(keyboard.locator('..')).toContainText('SR 键盘侠');
   const exclusion = await panel.locator('.lsa-forge-exclusion-item').first().boundingBox();
   expect(exclusion.width).toBeGreaterThan(60);
   expect(exclusion.height).toBeLessThan(36);
@@ -228,13 +233,13 @@ test('market watch notifies on a matching price without purchasing', async ({ ap
 });
 
 test('popup detects a newer GitHub version and explains the local update step', async ({ app }) => {
-  await app.worker.evaluate(async () => chrome.storage.local.set({ linuxSbTestRemoteVersion: '0.12.2' }));
+  await app.worker.evaluate(async version => chrome.storage.local.set({ linuxSbTestRemoteVersion: version }), nextVersion);
   const popup = await app.context.newPage();
   await popup.setViewportSize({ width: 360, height: 620 });
   await popup.goto(`chrome-extension://${app.id}/popup.html`);
   await popup.locator('#checkUpdate').click();
   await expect(popup.locator('#updateNotice')).toBeVisible();
-  await expect(popup.locator('#updateTitle')).toContainText('0.12.2');
+  await expect(popup.locator('#updateTitle')).toContainText(nextVersion);
   await expect(popup.locator('#updateDetail')).toContainText('替换本地扩展文件');
   await expect(popup.locator('#reloadUpdatedFiles')).toHaveText('替换文件后重载');
   expect(await app.worker.evaluate(async () => chrome.action.getBadgeText({}))).toBe('1');

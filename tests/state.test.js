@@ -5,13 +5,10 @@ const state = require('../lib/state');
 const { verifyStage } = require('../lib/forge');
 const key = state.STORAGE_KEY;
 
-test('image settings share defaults and never return upload credentials to content scripts', () => {
-  assert.equal(state.imageSettings().compressionQuality, 0.84);
-  const settings = state.imageSettings({ enabled: true, secretAccessKey: 'test-secret', accessKeyId: 'test-id', compressionQuality: 2, maxDimension: 1 });
-  assert.equal(settings.secretAccessKey, undefined);
-  assert.equal(settings.accessKeyId, undefined);
-  assert.equal(settings.compressionQuality, 0.95);
-  assert.equal(settings.maxDimension, 512);
+test('retired ad setting is excluded from snapshots', () => {
+  const root = state.normalize({ version: 2, settings: { adRemovalEnabled: true, reservePoints: 100 }, accounts: {} });
+  assert.equal(state.snapshot(root).settings.adRemovalEnabled, undefined);
+  assert.equal(state.snapshot(root).settings.reservePoints, 100);
 });
 
 test('migration preserves identified history and quarantines unknown legacy data', async () => {
@@ -33,7 +30,6 @@ test('concurrent partial settings and account writes do not clobber one another'
   await Promise.all([
     ext.request('SETTINGS', { patch: { forgeTarget: 'SSR', forgeKeepOne: false, forgeExcludedNames: ['萌新'] } }),
     ext.request('SETTINGS', { patch: { reservePoints: 300 } }),
-    ext.request('SETTINGS', { patch: { adRemovalEnabled: true } }),
     ext.request('CURRENT', { userId: '1', current: { points: 900 } }),
     ext.request('CURRENT', { userId: '2', current: { points: 42 } })
   ]);
@@ -44,7 +40,6 @@ test('concurrent partial settings and account writes do not clobber one another'
   assert.equal(one.settings.forgeTarget, 'SSR');
   assert.equal(one.settings.forgeKeepOne, false);
   assert.equal(one.settings.reservePoints, 300);
-  assert.equal(one.settings.adRemovalEnabled, true);
   assert.deepEqual(one.settings.forgeExcludedNames, ['萌新']);
 });
 

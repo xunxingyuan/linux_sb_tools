@@ -15,9 +15,22 @@ const wrap = html => '<!doctype html><html><head><meta charset="utf-8"><meta nam
 const test = base.extend({
   app: async ({}, use) => {
     const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'card-browser-'));
+    const extensionDir = fs.mkdtempSync(path.join(os.tmpdir(), 'card-extension-'));
+    fs.cpSync(root, extensionDir, { recursive: true, filter: source => {
+      const top = path.relative(root, source).split(path.sep)[0];
+      return !['.git', 'node_modules', 'browser-tests', 'tests', 'test-results', 'docs'].includes(top) && !source.endsWith('.zip');
+    } });
+    const marketHtml = `<div class="bar-right"><a href="/user/1">我的账号</a></div>
+      <form class="gacha-market-filters"></form><div class="gacha-market-grid">
+      <article class="gacha-market-card"><span class="gacha-title-name">欧皇</span><form class="gacha-market-buy" data-gacha-market-price="250" onsubmit="return false"><input name="listing_id" value="cheap"><input name="quantity" max="1"></form></article>
+      <article class="gacha-market-card"><span class="gacha-title-name">欧皇</span><form class="gacha-market-buy" data-gacha-market-price="300"><input name="listing_id" value="expensive"><input name="quantity" max="1"></form></article>
+      </div>`;
+    fs.writeFileSync(path.join(extensionDir, 'market-test-fetch.js'), `window.fetch = async () => ({ ok: true, text: async () => ${JSON.stringify(marketHtml)} });`);
+    const offscreenPath = path.join(extensionDir, 'market-offscreen.html');
+    fs.writeFileSync(offscreenPath, fs.readFileSync(offscreenPath, 'utf8').replace('<script src="market-offscreen.js"></script>', '<script src="market-test-fetch.js"></script><script src="market-offscreen.js"></script>'));
     const context = await chromium.launchPersistentContext(profileDir, {
       executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined,
-      headless: true, args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`, '--host-resolver-rules=MAP * ~NOTFOUND'],
+      headless: true, args: [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`, '--host-resolver-rules=MAP * ~NOTFOUND'],
       viewport: { width: 1100, height: 800 }
     });
     let inventory = structuredClone(startInventory);
@@ -48,6 +61,14 @@ const test = base.extend({
       if (url.pathname === '/gacha') html = gacha();
       else if (url.pathname === '/gacha_profile') html = profile('1', inventory);
       else if (url.pathname === '/topic/1') html = '<main><form action="/reply_edit"><div class="nb-editor"><textarea name="body"></textarea></div></form></main>';
+      else if (url.pathname === '/gacha_market') {
+        const entries = [
+          { id: 'cheap', name: '欧皇', price: 250 },
+          { id: 'expensive', name: '欧皇', price: 300 },
+          { id: 'other', name: '传说之龙', price: 200 }
+        ].filter(item => !url.searchParams.get('q') || item.name.includes(url.searchParams.get('q')));
+        html = `<main><form class="gacha-market-filters"><input name="q"></form><div class="gacha-market-grid">${entries.map(item => `<article class="gacha-market-card"><span class="gacha-title-name">${item.name}</span><form class="gacha-market-buy" data-gacha-market-title="${item.name}" data-gacha-market-price="${item.price}"><input name="listing_id" value="${item.id}"><input name="quantity" type="number" max="1"><button>购买</button></form></article>`).join('')}</div></main>`;
+      }
       else if (url.pathname === '/gacha_forge_center') {
         html = `<main class="gacha-center-page"><nav class="gacha-tabs" role="tablist">${['我的称号','称号抽取','称号熔炼','称号回收','UR 合成','称号交易'].map(label => `<a role="tab" href="#">${label}</a>`).join('')}</nav><div class="gacha-center-stat">积分 903</div>${['N','R','SR'].map(rarity => `<form action="/forge/${rarity}" method="post">${inventory.filter(t => t.rarity === rarity).map(t => `<article><span class="gacha-title-name">${t.name}</span><label><input name="titles[]" type="checkbox" value="${t.name}" data-gacha-forge-rarity="${rarity.toLowerCase()}"><input name="quantity[${t.name}]" type="number" min="1" max="${t.count}" value="1"></label></article>`).join('')}<input name="forge_count" data-gacha-forge-count><button data-gacha-forge-source="${rarity}">${rarity} 熔铸</button></form>`).join('')}</main>`;
       } else if (url.pathname === '/user/1') {
@@ -63,6 +84,7 @@ const test = base.extend({
     } finally {
       await context.close();
       fs.rmSync(profileDir, { recursive: true, force: true });
+      fs.rmSync(extensionDir, { recursive: true, force: true });
     }
   }
 });
@@ -113,7 +135,7 @@ test('real extension popup/options use shared storage without losing forge prefe
   const settings = await app.context.newPage();
   await settings.goto(`chrome-extension://${app.id}/options.html`);
   await settings.locator('#reservePoints').fill('250');
-  await settings.locator('#adRemovalEnabled').check();
+  await expect(settings.locator('#adRemovalEnabled, #imageHostForm')).toHaveCount(0);
   await settings.getByRole('button', { name: '保存设置', exact: true }).click();
   await expect(settings.locator('#message')).toHaveText('设置已保存。');
   const accountBox = await settings.locator('#accountLabel').boundingBox();
@@ -122,16 +144,14 @@ test('real extension popup/options use shared storage without losing forge prefe
   const popup = await app.context.newPage();
   await popup.setViewportSize({ width: 360, height: 620 });
   await popup.goto(`chrome-extension://${app.id}/popup.html`);
-  await expect(popup.locator('#adRemovalEnabled')).toBeChecked();
-  await expect(popup.locator('.page-grid button')).toHaveCount(3);
+  await expect(popup.locator('#adRemovalEnabled')).toHaveCount(0);
+  await expect(popup.locator('.page-grid button')).toHaveCount(4);
   await expect(popup.locator('.utility-row')).toBeVisible();
   await popup.screenshot({ path: path.join(root, 'docs/screenshots/popup-simplified.png'), fullPage: true });
-  await popup.locator('#adRemovalEnabled').uncheck();
-  await expect(popup.locator('#status')).toHaveText('设置已保存');
   const saved = await app.worker.evaluate(async key => (await chrome.storage.local.get(key))[key], titleStateKey);
   expect(saved.settings.reservePoints).toBe(250);
   expect(saved.settings.forgeTarget).toBe('SSR');
-  expect(saved.settings.adRemovalEnabled).toBe(false);
+  expect(saved.settings.adRemovalEnabled).toBeUndefined();
   await settings.screenshot({ path: path.join(root, 'docs/screenshots/settings-simplified.png'), fullPage: true });
 });
 
@@ -146,14 +166,56 @@ test('forge verifies each successful stage across page navigation', async ({ app
   expect(app.errors).toEqual([]);
 });
 
-test('image helper mounts from shared settings and removes itself when disabled', async ({ app }) => {
+test('retired helpers stay absent even with old settings', async ({ app }) => {
+  await app.worker.evaluate(async () => chrome.storage.local.set({ linuxSbImageHostConfig: { enabled: true, provider: 'cloudflare-r2' } }));
   await app.page.goto('https://linux.sb/topic/1');
   await expect(app.page.locator('#linux-sb-image-host')).toHaveCount(0);
-  await app.worker.evaluate(async () => chrome.storage.local.set({ linuxSbImageHostConfig: { enabled: true, provider: 'cloudflare-r2' } }));
-  await expect(app.page.locator('#linux-sb-image-host')).toBeVisible();
-  await app.worker.evaluate(async () => chrome.storage.local.set({ linuxSbImageHostConfig: { enabled: false } }));
-  await expect(app.page.locator('#linux-sb-image-host')).toHaveCount(0);
+  await expect(app.page.locator('html')).not.toHaveClass(/linux-sb-ad-removal-enabled/);
+  await app.page.goto('https://linux.sb/gacha');
+  await expect(app.page.locator('#linux-sb-title-assistant')).toBeVisible();
+  await expect(app.page.locator('html')).not.toHaveClass(/linux-sb-ad-removal-enabled/);
   expect(app.errors).toEqual([]);
+});
+
+test('market watch notifies on a matching price without purchasing', async ({ app }) => {
+  const settings = await app.context.newPage();
+  await settings.goto(`chrome-extension://${app.id}/options.html`);
+  await settings.locator('.market-title').fill('欧皇');
+  await settings.locator('.market-price').fill('280');
+  await settings.locator('#marketEnabled').check();
+  await settings.getByRole('button', { name: '保存监控' }).click();
+  await expect(settings.locator('#marketMessage')).toContainText('检查完成', { timeout: 20000 });
+  await expect(settings.locator('#marketStatus')).toContainText('最近命中 1 条');
+  const runtime = await app.worker.evaluate(async () => (await chrome.storage.local.get('linuxSbMarketWatchRuntime')).linuxSbMarketWatchRuntime);
+  expect(runtime.matches).toHaveLength(1);
+  expect(runtime.matches[0].id).toBe('cheap');
+  expect(Object.keys(runtime.notified)).toHaveLength(1);
+  const notifications = await app.worker.evaluate(async () => chrome.notifications.getAll());
+  expect(Object.keys(notifications)).toHaveLength(1);
+  const marketTabs = await app.worker.evaluate(async () => chrome.tabs.query({ url: 'https://linux.sb/gacha_market*' }));
+  expect(marketTabs).toHaveLength(0);
+  const alarm = await app.worker.evaluate(async () => chrome.alarms.get('linux-sb-market-watch'));
+  expect(alarm.periodInMinutes).toBe(5);
+  expect(app.submits).toEqual([]);
+  await app.page.goto('https://linux.sb/gacha');
+  const popup = await app.context.newPage();
+  await popup.setViewportSize({ width: 360, height: 620 });
+  await popup.goto(`chrome-extension://${app.id}/popup.html`);
+  await expect(popup.locator('#marketBadge')).toHaveText('监控中');
+  await expect(popup.locator('#marketSummary')).toContainText('最近命中 1 条');
+  await expect(popup.locator('#marketRules')).toContainText('欧皇');
+  await expect(popup.locator('#marketRules')).toContainText('≤ 280 分');
+  await popup.screenshot({ path: path.join(root, 'docs/screenshots/market-watch-popup.png'), fullPage: true });
+  await settings.locator('#marketCheckNow').click();
+  await expect(settings.locator('#marketMessage')).toContainText('检查完成');
+  const second = await app.worker.evaluate(async () => (await chrome.storage.local.get('linuxSbMarketWatchRuntime')).linuxSbMarketWatchRuntime);
+  expect(Object.keys(second.notified)).toHaveLength(1);
+  await settings.locator('#marketEnabled').uncheck();
+  await settings.getByRole('button', { name: '保存监控' }).click();
+  await expect(settings.locator('#marketMessage')).toContainText('监控已关闭');
+  await expect(popup.locator('#marketBadge')).toHaveText('已暂停');
+  await expect(popup.locator('#marketSummary')).toContainText('已保存 1 条规则');
+  expect(await app.worker.evaluate(async () => chrome.alarms.get('linux-sb-market-watch'))).toBeUndefined();
 });
 
 test('failed forge response pauses without submitting the next stage', async ({ app }) => {

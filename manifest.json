@@ -1,15 +1,17 @@
 {
   "manifest_version": 3,
   "name": "LINUX SB 扩展工具箱",
-  "version": "0.10.3",
-  "description": "LINUX SB 扩展工具箱，提供称号抽取统计、熔铸助手、图片压缩上传和可选去广告。",
+  "version": "0.12.0",
+  "description": "LINUX SB 扩展工具箱，提供称号统计、熔铸助手和市场价格提醒。",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "alarms",
+    "notifications",
+    "offscreen"
   ],
   "host_permissions": [
-    "https://linux.sb/*",
-    "https://*.r2.cloudflarestorage.com/*"
+    "https://linux.sb/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -49,32 +51,6 @@
       ],
       "css": [
         "content.css"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://linux.sb/topic_edit",
-        "https://linux.sb/topic/*"
-      ],
-      "js": [
-        "lib/state.js",
-        "image-host.js"
-      ],
-      "css": [
-        "image-host.css"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://linux.sb/*"
-      ],
-      "js": [
-        "ad-remover.js"
-      ],
-      "css": [
-        "ad-remover.css"
       ],
       "run_at": "document_idle"
     }

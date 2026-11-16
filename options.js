@@ -2,60 +2,51 @@
   'use strict';
 
   const store = globalThis.LinuxSbState;
-  const IMAGE_CONFIG_KEY = store.IMAGE_CONFIG_KEY;
   let displayedUserId = '';
   let displayedSettings = {};
 
   const form = document.getElementById('settingsForm');
   const reserve = document.getElementById('reservePoints');
   const confirmEachDraw = document.getElementById('confirmEachDraw');
-  const adRemovalEnabled = document.getElementById('adRemovalEnabled');
   const message = document.getElementById('message');
-  const imageHostForm = document.getElementById('imageHostForm');
-  const imageHostEnabled = document.getElementById('imageHostEnabled');
-  const imagePreset = document.getElementById('imagePreset');
-  const cloudflareAccountId = document.getElementById('cloudflareAccountId');
-  const cloudflareBucket = document.getElementById('cloudflareBucket');
-  const cloudflareAccessKeyId = document.getElementById('cloudflareAccessKeyId');
-  const cloudflareSecretAccessKey = document.getElementById('cloudflareSecretAccessKey');
-  const cloudflarePublicBaseUrl = document.getElementById('cloudflarePublicBaseUrl');
-  const cloudflareObjectPrefix = document.getElementById('cloudflareObjectPrefix');
-  const imageCompressionEnabled = document.getElementById('imageCompressionEnabled');
-  const imageCompressionQuality = document.getElementById('imageCompressionQuality');
-  const imageMaxDimension = document.getElementById('imageMaxDimension');
-  const imageHostMessage = document.getElementById('imageHostMessage');
+  const marketForm = document.getElementById('marketWatchForm');
+  const marketRules = document.getElementById('marketRules');
+  const marketMessage = document.getElementById('marketMessage');
 
-  function clamp(value, min, max, fallback) {
-    const number = Number(value);
-    return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
+  async function marketRequest(type, config) {
+    const response = await chrome.runtime.sendMessage({ type, config });
+    if (!response?.ok) throw new Error(response?.error || '市场监控操作失败');
+    return response.result;
   }
 
-  async function readState() { return store.request('GET'); }
-
-  async function readImageConfig() {
-    const value = await chrome.storage.local.get(IMAGE_CONFIG_KEY);
-    return { ...store.DEFAULT_IMAGE_CONFIG, ...value[IMAGE_CONFIG_KEY] };
+  function addRule(rule = {}) {
+    const row = document.createElement('div');
+    row.className = 'market-rule';
+    row.dataset.ruleId = rule.id || '';
+    const titleLabel = document.createElement('label');
+    titleLabel.textContent = '称号名称';
+    const title = document.createElement('input');
+    title.type = 'text'; title.className = 'market-title'; title.maxLength = 80;
+    title.placeholder = '例如：反贼'; title.value = rule.title || '';
+    titleLabel.append(title);
+    const priceLabel = document.createElement('label');
+    priceLabel.textContent = '最高单价（积分）';
+    const price = document.createElement('input');
+    price.type = 'number'; price.className = 'market-price'; price.min = '1'; price.max = '1000000000'; price.step = '1';
+    price.value = rule.maxPrice || '';
+    priceLabel.append(price);
+    const remove = document.createElement('button');
+    remove.type = 'button'; remove.className = 'market-remove'; remove.textContent = '移除';
+    remove.addEventListener('click', () => row.remove());
+    row.append(titleLabel, priceLabel, remove);
+    marketRules.append(row);
   }
 
-  async function writeImageConfig(config) {
-    await chrome.storage.local.set({ [IMAGE_CONFIG_KEY]: config });
-  }
-
-  function collectImageConfig(currentConfig) {
-    return {
-      ...currentConfig,
-      enabled: imageHostEnabled.checked,
-      provider: 'cloudflare-r2',
-      accountId: cloudflareAccountId.value.trim(),
-      bucket: cloudflareBucket.value.trim(),
-      accessKeyId: cloudflareAccessKeyId.value.trim(),
-      secretAccessKey: cloudflareSecretAccessKey.value.trim() || currentConfig.secretAccessKey || '',
-      publicBaseUrl: cloudflarePublicBaseUrl.value.trim(),
-      objectPrefix: cloudflareObjectPrefix.value.trim() || 'linux-sb',
-      compressionEnabled: imageCompressionEnabled.checked,
-      compressionQuality: clamp(imageCompressionQuality.value, 0.5, 0.95, 0.84),
-      maxDimension: Math.round(clamp(imageMaxDimension.value, 512, 8192, 2560))
-    };
+  function showMarketStatus(runtime) {
+    const checked = runtime.lastCheckedAt ? new Date(runtime.lastCheckedAt).toLocaleString('zh-CN') : '尚未检查';
+    const matched = Array.isArray(runtime.matches) ? runtime.matches.length : 0;
+    document.getElementById('marketStatus').textContent = `上次检查：${checked} · 最近命中 ${matched} 条${runtime.accountId ? ` · 账号 ${runtime.accountId}` : ''}`;
+    if (runtime.lastError) marketMessage.textContent = `检查失败：${runtime.lastError}`;
   }
 
   form.addEventListener('submit', async (event) => {
@@ -63,15 +54,13 @@
     try {
       const values = {
         reservePoints: Math.max(0, Number(reserve.value) || 0),
-        confirmEachDraw: confirmEachDraw.checked,
-        adRemovalEnabled: adRemovalEnabled.checked
+        confirmEachDraw: confirmEachDraw.checked
       };
       const patch = Object.fromEntries(Object.entries(values).filter(([key, value]) => value !== displayedSettings[key]));
       const saved = await store.request('SETTINGS', { patch });
       displayedSettings = { ...saved.settings };
       reserve.value = String(saved.settings.reservePoints);
       confirmEachDraw.checked = saved.settings.confirmEachDraw;
-      adRemovalEnabled.checked = saved.settings.adRemovalEnabled;
       message.textContent = '设置已保存。';
     } catch (error) { message.textContent = error.message; }
   });
@@ -83,79 +72,66 @@
     } catch (error) { message.textContent = error.message; }
   });
 
-  imageHostForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const currentConfig = await readImageConfig();
-    try {
-      const config = collectImageConfig(currentConfig);
-      if (config.enabled) {
-        if (![config.accountId, config.bucket, config.accessKeyId, config.secretAccessKey].every(Boolean)) throw new Error('请填写账户 ID、Bucket 和访问凭据');
-        if (new URL(config.publicBaseUrl).protocol !== 'https:') throw new Error('公开访问地址需要使用 HTTPS');
-      }
-      await writeImageConfig(config);
-      imageHostMessage.textContent = config.enabled ? '图床助手已启用。' : '图床助手已关闭。';
-    } catch (error) { imageHostMessage.textContent = error.message; }
-  });
-
-  document.getElementById('disableImageHost').addEventListener('click', async () => {
-    imageHostEnabled.checked = false;
-    const currentConfig = await readImageConfig();
-    await writeImageConfig({ ...collectImageConfig(currentConfig), enabled: false });
-    imageHostMessage.textContent = '图床助手已关闭。';
-  });
-
-  document.getElementById('clearImageCredentials').addEventListener('click', async () => {
-    imageHostEnabled.checked = false;
-    cloudflareAccountId.value = '';
-    cloudflareBucket.value = '';
-    cloudflareAccessKeyId.value = '';
-    cloudflareSecretAccessKey.value = '';
-    cloudflarePublicBaseUrl.value = '';
-    cloudflareObjectPrefix.value = 'linux-sb';
-    imageCompressionEnabled.checked = true;
-    imageCompressionQuality.value = '0.84';
-    imageMaxDimension.value = '2560';
-    imagePreset.value = 'recommended';
-    await writeImageConfig({ ...store.DEFAULT_IMAGE_CONFIG });
-    imageHostMessage.textContent = 'Cloudflare R2 凭据已清除，图床助手已关闭。';
-  });
-
-  function syncPreset() {
-    imagePreset.value = !imageCompressionEnabled.checked ? 'original'
-      : Number(imageCompressionQuality.value) === 0.84 && Number(imageMaxDimension.value) === 2560 ? 'recommended'
-      : Number(imageCompressionQuality.value) === 0.9 && Number(imageMaxDimension.value) === 4096 ? 'high' : 'custom';
-  }
-  imagePreset.addEventListener('change', () => {
-    const preset = imagePreset.value;
-    if (preset === 'custom') { document.getElementById('imageAdvanced').open = true; return; }
-    imageCompressionEnabled.checked = preset !== 'original';
-    if (preset !== 'original') {
-      imageCompressionQuality.value = preset === 'high' ? '0.9' : '0.84';
-      imageMaxDimension.value = preset === 'high' ? '4096' : '2560';
-    }
-  });
-  [imageCompressionEnabled, imageCompressionQuality, imageMaxDimension].forEach(input => input.addEventListener('change', syncPreset));
-
-  Promise.all([readState(), readImageConfig()]).then(([state, imageConfig]) => {
+  store.request('GET').then((state) => {
     displayedSettings = { ...state.settings };
     reserve.value = String(state.settings.reservePoints || 0);
     confirmEachDraw.checked = state.settings.confirmEachDraw !== false;
-    adRemovalEnabled.checked = state.settings.adRemovalEnabled === true;
-    imageHostEnabled.checked = imageConfig.enabled === true;
     displayedUserId = state.userId;
     document.getElementById('clearHistory').disabled = !state.userId;
     document.getElementById('accountLabel').textContent = state.userId ? `当前统计账号：${state.userId}` : '请先在称号页面确认账号';
-    cloudflareAccountId.value = imageConfig.accountId || '';
-    cloudflareBucket.value = imageConfig.bucket || '';
-    cloudflareAccessKeyId.value = imageConfig.accessKeyId || '';
-    cloudflareSecretAccessKey.value = imageConfig.secretAccessKey || '';
-    cloudflarePublicBaseUrl.value = imageConfig.publicBaseUrl || '';
-    cloudflareObjectPrefix.value = imageConfig.objectPrefix || 'linux-sb';
-    imageCompressionEnabled.checked = imageConfig.compressionEnabled !== false;
-    imageCompressionQuality.value = String(clamp(imageConfig.compressionQuality, 0.5, 0.95, 0.84));
-    imageMaxDimension.value = String(Math.round(clamp(imageConfig.maxDimension, 512, 8192, 2560)));
-    syncPreset();
   }).catch(() => {
     message.textContent = '读取设置失败。';
+  });
+
+  document.getElementById('addMarketRule').addEventListener('click', () => {
+    if (marketRules.children.length >= 10) { marketMessage.textContent = '最多监控 10 种称号。'; return; }
+    addRule();
+  });
+
+  marketForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    marketMessage.textContent = '正在保存…';
+    try {
+      const config = {
+        enabled: document.getElementById('marketEnabled').checked,
+        intervalMinutes: Number(document.getElementById('marketInterval').value),
+        rules: [...marketRules.children].filter((row) => row.querySelector('.market-title').value.trim() || row.querySelector('.market-price').value).map((row) => ({
+          id: row.dataset.ruleId,
+          title: row.querySelector('.market-title').value,
+          maxPrice: Number(row.querySelector('.market-price').value)
+        }))
+      };
+      const saved = await marketRequest('MARKET_SAVE', config);
+      marketRules.replaceChildren();
+      saved.config.rules.forEach(addRule);
+      marketMessage.textContent = saved.config.enabled ? '监控已保存，正在首次检查…' : '监控已关闭。';
+      showMarketStatus(saved.runtime);
+      if (saved.config.enabled) {
+        const checked = await marketRequest('MARKET_CHECK');
+        showMarketStatus(checked.runtime);
+        marketMessage.textContent = `检查完成，命中 ${checked.runtime.matches.length} 条。`;
+      }
+    } catch (error) { marketMessage.textContent = error.message; }
+  });
+
+  document.getElementById('marketCheckNow').addEventListener('click', async () => {
+    marketMessage.textContent = '正在检查市场…';
+    try {
+      const checked = await marketRequest('MARKET_CHECK');
+      showMarketStatus(checked.runtime);
+      marketMessage.textContent = `检查完成，命中 ${checked.runtime.matches.length} 条。`;
+    } catch (error) { marketMessage.textContent = error.message; }
+  });
+
+  marketRequest('MARKET_GET').then(({ config, runtime }) => {
+    document.getElementById('marketEnabled').checked = config.enabled;
+    document.getElementById('marketInterval').value = String(config.intervalMinutes);
+    config.rules.forEach(addRule);
+    if (!config.rules.length) addRule();
+    showMarketStatus(runtime);
+  }).catch((error) => { marketMessage.textContent = error.message; });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.linuxSbMarketWatchRuntime) showMarketStatus(changes.linuxSbMarketWatchRuntime.newValue);
   });
 })();

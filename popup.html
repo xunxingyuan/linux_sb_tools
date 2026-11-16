@@ -11,7 +11,7 @@
       <header class="popup-header">
         <div>
           <div class="popup-title">🧰 LINUX SB 扩展工具箱</div>
-          <div class="popup-subtitle">称号 · 熔铸 · 图床</div>
+          <div class="popup-subtitle">称号统计 · 熔铸助手 · 市场提醒</div>
         </div>
         <span class="local-badge">本地</span>
       </header>
@@ -25,19 +25,29 @@
         <div class="metric"><span>累计投入</span><strong id="spend">—</strong></div>
       </section>
 
+      <section class="market-monitor" aria-labelledby="marketMonitorTitle">
+        <div class="market-monitor-header">
+          <strong id="marketMonitorTitle">市场监控</strong>
+          <span id="marketBadge" class="market-badge">读取中</span>
+        </div>
+        <p id="marketSummary" class="market-summary">正在读取监控规则…</p>
+        <ul id="marketRules" class="market-rule-list" aria-label="监控的称号"></ul>
+        <div class="market-monitor-footer">
+          <span id="marketLastCheck">尚未检查</span>
+          <button id="manageMarket" type="button" class="text-button">管理规则</button>
+        </div>
+      </section>
+
       <section class="page-actions" aria-label="快捷操作">
         <button id="refresh" class="primary refresh-button">更新数据</button>
         <div class="page-grid">
           <button id="openGacha">称号抽取</button>
           <button id="openForge">熔铸助手</button>
           <button id="openProfile">我的称号</button>
+          <button id="openMarket">称号市场</button>
         </div>
       </section>
       <div class="utility-row">
-        <label class="toggle-row" for="adRemovalEnabled">
-          <input id="adRemovalEnabled" type="checkbox">
-          <span>隐藏右侧广告</span>
-        </label>
         <button id="openOptions" class="text-button">更多设置</button>
       </div>
     </main>

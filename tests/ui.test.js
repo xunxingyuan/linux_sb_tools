@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { extension, source, tick, gacha, profile, forge, accountBar } = require('../test-support/extension');
 const state = require('../lib/state');
+const market = require('../lib/market');
 const key = state.STORAGE_KEY;
 const scripts = ['lib/state.js', 'lib/parser.js', 'lib/forge.js', 'lib/history.js', 'content.js'];
 async function pageFor(ext, html, path = '/gacha', fetcher) {
@@ -12,54 +13,65 @@ async function pageFor(ext, html, path = '/gacha', fetcher) {
   return dom;
 }
 
-test('popup reads ad toggle, saves only changed field, and keeps budget settings out of popup', async t => {
+test('popup shows title actions without retired controls', async t => {
   const ext = extension({ [key]: { userId: '1', settings: { adRemovalEnabled: true, reservePoints: 100, forgeTarget: 'SSR', forgeKeepOne: false } } });
   const dom = ext.dom(source('popup.html'), 'https://extension.test/popup.html');
   t.after(dom.close);
   ['lib/state.js', 'lib/parser.js', 'popup.js'].forEach(dom.evaluate);
   await tick();
-  const input = dom.document.getElementById('adRemovalEnabled');
-  assert.equal(input.checked, true);
+  assert.equal(dom.document.getElementById('adRemovalEnabled'), null);
   assert.equal(dom.document.getElementById('reserve'), null);
-  assert.equal(dom.document.querySelectorAll('.page-grid button').length, 3);
+  assert.equal(dom.document.querySelectorAll('.page-grid button').length, 4);
   assert.ok(dom.document.querySelector('.utility-row'));
-  input.checked = false;
-  input.dispatchEvent(new dom.window.Event('change'));
-  await tick();
   const current = await ext.request('GET');
-  assert.equal(current.settings.adRemovalEnabled, false);
+  assert.equal(current.settings.adRemovalEnabled, undefined);
   assert.equal(current.settings.reservePoints, 100);
   assert.equal(current.settings.forgeTarget, 'SSR');
   assert.equal(current.settings.forgeKeepOne, false);
+  assert.equal(dom.document.getElementById('marketBadge').textContent, '未设置');
 });
 
-test('options save retains forge preferences and compression presets preserve custom values', async t => {
-  const ext = extension({ [key]: { userId: '1', settings: { forgeExcludedNames: ['萌新'], forgeTarget: 'SSR' } }, [state.IMAGE_CONFIG_KEY]: { compressionEnabled: true, compressionQuality: 0.87, maxDimension: 3000 } });
+test('popup shows monitored titles, prices, recent matches and errors', async t => {
+  const config = { enabled: true, intervalMinutes: 10, rules: [
+    { id: 'one', title: '反贼', maxPrice: 4999 }, { id: 'two', title: '欧皇', maxPrice: 280 }
+  ] };
+  const runtime = { accountId: '1', lastCheckedAt: '2026-11-16T07:00:00.000Z', lastError: '', matches: [{ ruleId: 'one' }] };
+  const ext = extension({ [market.CONFIG_KEY]: config, [market.RUNTIME_KEY]: runtime });
+  const dom = ext.dom(source('popup.html'), 'https://extension.test/popup.html');
+  t.after(dom.close);
+  ['lib/state.js', 'lib/parser.js', 'popup.js'].forEach(dom.evaluate);
+  await tick();
+  const $ = id => dom.document.getElementById(id);
+  assert.equal($('marketBadge').textContent, '监控中');
+  assert.match($('marketSummary').textContent, /每 10 分钟检查 · 最近命中 1 条/);
+  assert.match($('marketRules').textContent, /反贼.*4,999 分.*欧皇.*280 分/);
+  assert.equal($('marketRules').querySelectorAll('li.is-match').length, 1);
+  await ext.local.set({ [market.RUNTIME_KEY]: { ...runtime, lastError: '登录已失效' } });
+  await tick();
+  assert.equal($('marketBadge').textContent, '检查异常');
+  assert.equal($('marketSummary').textContent, '登录已失效');
+});
+
+test('options save retains forge preferences and hides retired controls', async t => {
+  const ext = extension({ [key]: { userId: '1', settings: { forgeExcludedNames: ['萌新'], forgeTarget: 'SSR' } } });
   const dom = ext.dom(source('options.html'), 'https://extension.test/options.html');
   t.after(dom.close);
   ['lib/state.js', 'options.js'].forEach(dom.evaluate);
   await tick();
   const $ = id => dom.document.getElementById(id);
-  assert.equal($('imagePreset').value, 'custom');
-  assert.equal($('imageAdvanced').open, false);
-  assert.equal($('imageProvider'), null);
+  assert.equal($('imageHostForm'), null);
+  assert.equal($('adRemovalEnabled'), null);
   $('reservePoints').value = '250';
   $('settingsForm').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
   await tick();
   assert.equal((await ext.request('GET')).settings.reservePoints, 250);
   assert.deepEqual((await ext.request('GET')).settings.forgeExcludedNames, ['萌新']);
-  // A popup can change another field while this settings page is still open.
-  await ext.request('SETTINGS', { patch: { adRemovalEnabled: true } });
+  // A title page can change another field while this settings page is still open.
+  await ext.request('SETTINGS', { patch: { forgeTarget: 'SR' } });
   $('reservePoints').value = '300';
   $('settingsForm').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
   await tick();
-  assert.equal((await ext.request('GET')).settings.adRemovalEnabled, true);
-  $('imagePreset').value = 'high';
-  $('imagePreset').dispatchEvent(new dom.window.Event('change'));
-  $('imageHostForm').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
-  await tick();
-  assert.equal(ext.data[state.IMAGE_CONFIG_KEY].compressionQuality, 0.9);
-  assert.equal(ext.data[state.IMAGE_CONFIG_KEY].maxDimension, 4096);
+  assert.equal((await ext.request('GET')).settings.forgeTarget, 'SR');
 });
 
 test('gacha defaults to compact summary; settings updates preserve expanded detail and focused control', async t => {

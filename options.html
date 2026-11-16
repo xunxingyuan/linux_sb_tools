@@ -9,7 +9,7 @@
   <body>
     <main class="options">
       <h1>LINUX SB 扩展工具箱</h1>
-      <p class="intro">设置个人积分抽取的安全提醒，以及发帖时使用的可选图床。</p>
+      <p class="intro">设置积分抽取提醒和称号市场价格提醒。</p>
       <form id="settingsForm">
         <label class="field">
           <span>最低保留积分</span>
@@ -20,11 +20,6 @@
           <input id="confirmEachDraw" type="checkbox" checked>
           <span>每次抽取前显示确认提示</span>
         </label>
-        <label class="check-field">
-          <input id="adRemovalEnabled" type="checkbox">
-          <span>隐藏右侧广告（默认关闭）</span>
-        </label>
-        <small class="setting-help">开启后仅隐藏论坛右侧的广告卡片，不影响帖子、版块列表和每日热帖。</small>
         <p id="accountLabel" class="account-label"></p>
         <div class="button-row">
           <button class="primary" type="submit">保存设置</button>
@@ -33,83 +28,32 @@
         <div id="message" class="message" aria-live="polite"></div>
       </form>
 
-      <section class="settings-card">
-        <div class="card-heading">
-          <div>
-            <h2>图床助手</h2>
-            <p>默认关闭；开启后只在发帖或回帖页出现。</p>
-          </div>
-          <span class="default-badge">默认关闭</span>
-        </div>
-        <form id="imageHostForm">
-          <label class="check-field image-toggle-field">
-            <input id="imageHostEnabled" type="checkbox">
-            <span>启用 Cloudflare R2 图片上传</span>
+      <section class="settings-card" aria-labelledby="marketHeading">
+        <h2 id="marketHeading">称号市场价格提醒</h2>
+        <p class="market-help">按称号名称和最高单价监控在售交易。命中后显示桌面通知，点击通知打开市场，由你确认购买。检查在后台进行，无需保持市场页面打开。</p>
+        <form id="marketWatchForm">
+          <label class="check-field">
+            <input id="marketEnabled" type="checkbox">
+            <span>启用价格监控</span>
           </label>
           <label class="field">
-            <span>Cloudflare 账户 ID</span>
-            <input id="cloudflareAccountId" type="text" autocomplete="off" spellcheck="false" placeholder="填写 Cloudflare Account ID">
-            <small>在 Cloudflare 控制台的账户概览中可以找到。</small>
-          </label>
-          <label class="field">
-            <span>R2 Bucket 名称</span>
-            <input id="cloudflareBucket" type="text" autocomplete="off" spellcheck="false" placeholder="填写 R2 Bucket 名称">
-            <small>填写要保存图片的 R2 Bucket。</small>
-          </label>
-          <label class="field">
-            <span>R2 Access Key ID</span>
-            <input id="cloudflareAccessKeyId" type="text" autocomplete="off" spellcheck="false" placeholder="填写 R2 Access Key ID">
-          </label>
-          <label class="field">
-            <span>R2 Secret Access Key</span>
-            <input id="cloudflareSecretAccessKey" type="password" autocomplete="off" spellcheck="false" placeholder="填写 R2 Secret Access Key">
-          </label>
-          <label class="field">
-            <span>图片公开访问地址</span>
-            <input id="cloudflarePublicBaseUrl" type="url" autocomplete="off" spellcheck="false" placeholder="例如：https://img.example.com 或 https://pub-xxx.r2.dev">
-            <small>需要已绑定到 Bucket 的自定义域名或 R2 公网地址。</small>
-          </label>
-          <label class="field">
-            <span>上传画质</span>
-            <select id="imagePreset">
-              <option value="recommended">推荐 · 兼顾清晰和体积</option>
-              <option value="high">高清 · 更大尺寸</option>
-              <option value="original">原图 · 不压缩</option>
-              <option value="custom">自定义</option>
+            <span>检查间隔</span>
+            <select id="marketInterval">
+              <option value="5">每 5 分钟</option>
+              <option value="10">每 10 分钟</option>
+              <option value="30">每 30 分钟</option>
+              <option value="60">每 60 分钟</option>
             </select>
           </label>
-          <details id="imageAdvanced">
-            <summary>高级设置</summary>
-          <label class="field">
-            <span>对象前缀（可选）</span>
-            <input id="cloudflareObjectPrefix" type="text" autocomplete="off" spellcheck="false" value="linux-sb" placeholder="linux-sb">
-          </label>
-          <div class="image-compression-settings">
-            <div class="compression-title">上传优化</div>
-            <label class="check-field image-toggle-field">
-              <input id="imageCompressionEnabled" type="checkbox" checked>
-              <span>上传前压缩图片（推荐）</span>
-            </label>
-            <label class="field compact-field">
-              <span>压缩质量</span>
-              <input id="imageCompressionQuality" type="number" min="0.5" max="0.95" step="0.01" value="0.84">
-            </label>
-            <label class="field compact-field">
-              <span>最长边上限</span>
-              <input id="imageMaxDimension" type="number" min="512" max="8192" step="1" value="2560">
-              <small>JPG、PNG、WebP 会转换为 WebP；GIF 动图和 SVG 保留原格式。</small>
-            </label>
+          <div id="marketRules" class="market-rules" aria-label="价格规则"></div>
+          <button id="addMarketRule" type="button">添加称号</button>
+          <div class="button-row market-actions">
+            <button class="primary" type="submit">保存监控</button>
+            <button id="marketCheckNow" type="button">立即检查</button>
+            <a class="market-link" href="https://linux.sb/gacha_market" target="_blank" rel="noopener">打开市场</a>
           </div>
-          </details>
-          <div class="image-host-note">
-            图片会以公开链接形式访问。压缩在浏览器本地完成，只有压缩后的图片才会上传；如果压缩结果反而变大，则自动保留原图。Access Key 和 Secret Access Key 属于敏感凭据，只保存在本地扩展设置中；不要在聊天中发送，也不要上传隐私图片。
-          </div>
-          <div class="button-row">
-            <button class="primary" type="submit">保存图床设置</button>
-            <button id="disableImageHost" type="button">关闭图床</button>
-          </div>
-          <button id="clearImageCredentials" class="secondary-button" type="button">清除 Cloudflare R2 凭据</button>
-          <div id="imageHostMessage" class="message" aria-live="polite"></div>
+          <div id="marketMessage" class="message" aria-live="polite"></div>
+          <p id="marketStatus" class="market-status"></p>
         </form>
       </section>
     </main>

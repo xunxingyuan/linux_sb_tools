@@ -3,6 +3,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
 const { JSDOM } = require('jsdom');
+const market = require('../lib/market');
 const root = path.resolve(__dirname, '..');
 const source = file => fs.readFileSync(path.join(root, file), 'utf8');
 const clone = value => value === undefined ? undefined : structuredClone(value);
@@ -42,6 +43,10 @@ function extension(initial = {}) {
       storage: { local, onChanged: { addListener(fn) { listeners.push(fn); } } },
       runtime: {
         sendMessage: async message => {
+          if (message.type === 'MARKET_GET') return { ok: true, result: {
+            config: market.normalizeConfig(data[market.CONFIG_KEY]),
+            runtime: { accountId: '', lastCheckedAt: '', lastError: '', matches: [], ...clone(data[market.RUNTIME_KEY]) }
+          } };
           try { return { ok: true, result: await request(message.action, message, tabId) }; }
           catch (error) { return { ok: false, error: error.message }; }
         },

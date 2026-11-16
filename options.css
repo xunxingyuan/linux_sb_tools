@@ -23,11 +23,6 @@ h1 {
   font-size: 24px;
 }
 
-h2 {
-  margin: 0;
-  font-size: 18px;
-}
-
 .intro {
   margin: 8px 0 26px;
   color: #6b7280;
@@ -48,38 +43,18 @@ h2 {
   font: inherit;
 }
 
+.field select {
+  width: 180px;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+}
+
 .field small {
   color: #6b7280;
   font-weight: 400;
-}
-
-.inline-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.small-action {
-  padding: 6px 10px;
-  font-size: 12px;
-}
-
-.inline-status {
-  color: #166534;
-  font-size: 12px;
-}
-
-.inline-status.is-error {
-  color: #b91c1c;
-}
-
-.redirect-hint {
-  margin: 10px 0 16px;
-  color: #6b7280;
-  font-size: 11px;
-  line-height: 1.5;
-  word-break: break-all;
 }
 
 .check-field {
@@ -91,14 +66,6 @@ h2 {
 
 .check-field input {
   margin: 0;
-}
-
-.setting-help {
-  display: block;
-  margin: -12px 0 24px;
-  color: #6b7280;
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .account-label {
@@ -139,19 +106,6 @@ button.primary:hover {
   color: #fff;
 }
 
-.secondary-button {
-  margin-top: 8px;
-  border: 0;
-  background: transparent;
-  color: #6b7280;
-  font-size: 12px;
-}
-
-.secondary-button:hover {
-  border-color: transparent;
-  color: #b91c1c;
-}
-
 .message {
   min-height: 20px;
   margin-top: 14px;
@@ -164,89 +118,44 @@ button.primary:hover {
   border-top: 1px solid #e5e7eb;
 }
 
-.card-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 16px;
-}
+h2 { margin: 0; font-size: 18px; }
 
-.card-heading p {
-  margin: 5px 0 0;
+.market-help, .market-status {
   color: #6b7280;
   font-size: 13px;
+  line-height: 1.6;
 }
 
-.default-badge {
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: #f3f4f6;
-  color: #6b7280;
-  font-size: 11px;
-  white-space: nowrap;
+.market-help { margin: 8px 0 20px; }
+
+.market-rules { display: grid; gap: 10px; margin-bottom: 12px; }
+
+.market-rule {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px auto;
+  align-items: end;
+  gap: 10px;
 }
 
-.image-toggle-field {
-  margin-bottom: 18px;
-}
+.market-rule label { display: grid; gap: 6px; font-size: 13px; }
 
-.field select {
-  width: min(100%, 360px);
+.market-rule input {
+  box-sizing: border-box;
+  width: 100%;
   padding: 8px 10px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  background: #fff;
-  color: #1f2937;
   font: inherit;
 }
 
-.settings-card .field input[type="text"],
-.settings-card .field input[type="password"],
-.settings-card .field input[type="url"] {
-  width: 100%;
-  max-width: 100%;
-}
+.market-actions { align-items: center; flex-wrap: wrap; margin-top: 18px; }
 
-.image-host-note {
-  margin: 12px 0 18px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: #fffbeb;
-  color: #92400e;
-  font-size: 12px;
-}
+.market-link { color: #2563eb; font-size: 13px; text-decoration: none; }
+.market-link:hover { text-decoration: underline; }
+.market-status { margin: 0; }
 
-.image-compression-settings {
-  margin: 20px 0 18px;
-  padding: 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #f8fafc;
+@media (max-width: 540px) {
+  .options { box-sizing: border-box; width: calc(100vw - 24px); margin: 12px auto; padding: 18px; }
+  .market-rule { grid-template-columns: minmax(0, 1fr) 110px; }
+  .market-rule button { grid-column: 1 / -1; justify-self: end; }
 }
-
-.compression-title {
-  margin-bottom: 12px;
-  color: #1f2937;
-  font-weight: 700;
-}
-
-.image-compression-settings .check-field {
-  margin-bottom: 16px;
-}
-
-.compact-field {
-  margin-bottom: 12px;
-}
-
-.compact-field:last-child {
-  margin-bottom: 0;
-}
-
-.compact-field input[type="number"] {
-  width: 180px;
-}
-
-.options details { margin: 12px 0; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; }
-.options summary { cursor: pointer; font-weight: 600; }
-.options details[open] summary { margin-bottom: 14px; }

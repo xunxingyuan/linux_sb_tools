@@ -47,10 +47,13 @@ function extension(initial = {}) {
             config: market.normalizeConfig(data[market.CONFIG_KEY]),
             runtime: { accountId: '', lastCheckedAt: '', lastError: '', matches: [], ...clone(data[market.RUNTIME_KEY]) }
           } };
+          if (['UPDATE_GET', 'UPDATE_CHECK'].includes(message.type)) return { ok: true, status: {
+            localVersion: '0.12.1', remoteVersion: '0.12.1', available: false, error: ''
+          } };
           try { return { ok: true, result: await request(message.action, message, tabId) }; }
           catch (error) { return { ok: false, error: error.message }; }
         },
-        onMessage: { addListener() {} }, openOptionsPage() {}
+        onMessage: { addListener() {} }, openOptionsPage() {}, reload() {}
       },
       tabs: { query: async () => [{ id: tabId }], create() {} }
     };

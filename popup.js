@@ -3,6 +3,24 @@
   const store = globalThis.LinuxSbState;
   const $ = id => document.getElementById(id);
   const formatNumber = value => value !== null && value !== undefined && Number.isFinite(Number(value)) ? Number(value).toLocaleString('zh-CN') : '—';
+  const REPOSITORY_URL = 'https://github.com/xunxingyuan/linux_sb_tools';
+  function renderUpdate(status, manual = false) {
+    $('updateNotice').hidden = !status.available;
+    if (status.available) {
+      $('updateTitle').textContent = `GitHub 已发布 ${status.remoteVersion}`;
+      $('updateDetail').textContent = `当前为 ${status.localVersion}。请先从 GitHub 获取新版并替换本地扩展文件，然后重新加载。`;
+    }
+    if (manual) {
+      $('updateMessage').textContent = status.error ? `检查失败：${status.error}`
+        : status.available ? `发现新版本 ${status.remoteVersion}` : `当前 ${status.localVersion} 已是最新版本`;
+    }
+  }
+
+  async function checkUpdate(type, manual = false) {
+    const response = await chrome.runtime.sendMessage({ type });
+    if (!response?.ok) throw new Error(response?.error || '检查更新失败');
+    renderUpdate(response.status, manual);
+  }
   function renderMarket({ config, runtime }) {
     const rules = config.rules || [];
     const badge = $('marketBadge');
@@ -77,12 +95,27 @@
   }
   $('openOptions').addEventListener('click', () => chrome.runtime.openOptionsPage());
   $('manageMarket').addEventListener('click', () => chrome.runtime.openOptionsPage());
+  $('openUpdate').addEventListener('click', () => { chrome.tabs.create({ url: REPOSITORY_URL }); window.close(); });
+  $('reloadUpdatedFiles').addEventListener('click', () => chrome.runtime.reload());
+  $('checkUpdate').addEventListener('click', async () => {
+    const button = $('checkUpdate');
+    button.disabled = true;
+    $('updateMessage').textContent = '正在检查 GitHub…';
+    try { await checkUpdate('UPDATE_CHECK', true); }
+    catch (error) { $('updateMessage').textContent = `检查失败：${error.message}`; }
+    finally { button.disabled = false; }
+  });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && (changes.linuxSbMarketWatchConfig || changes.linuxSbMarketWatchRuntime)) {
       loadMarket().catch(() => { $('marketSummary').textContent = '读取监控状态失败'; });
     }
+    if (area === 'local' && changes.linuxSbUpdateStatus) {
+      const status = changes.linuxSbUpdateStatus.newValue;
+      if (status) renderUpdate(status);
+    }
   });
   store.request('GET').then(render).catch(error => setStatus(error.message, true));
+  checkUpdate('UPDATE_GET').catch(() => {});
   loadMarket().catch(() => {
     $('marketBadge').textContent = '读取失败';
     $('marketBadge').classList.add('is-error');

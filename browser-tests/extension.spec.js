@@ -28,6 +28,15 @@ const test = base.extend({
     fs.writeFileSync(path.join(extensionDir, 'market-test-fetch.js'), `window.fetch = async () => ({ ok: true, text: async () => ${JSON.stringify(marketHtml)} });`);
     const offscreenPath = path.join(extensionDir, 'market-offscreen.html');
     fs.writeFileSync(offscreenPath, fs.readFileSync(offscreenPath, 'utf8').replace('<script src="market-offscreen.js"></script>', '<script src="market-test-fetch.js"></script><script src="market-offscreen.js"></script>'));
+    fs.writeFileSync(path.join(extensionDir, 'update-test-fetch.js'), `const originalFetch = globalThis.fetch; globalThis.fetch = async (url, options) => {
+      if (String(url).startsWith('https://raw.githubusercontent.com/xunxingyuan/linux_sb_tools/')) {
+        const data = await chrome.storage.local.get('linuxSbTestRemoteVersion');
+        return { ok: true, json: async () => ({ version: data.linuxSbTestRemoteVersion || '0.12.1' }) };
+      }
+      return originalFetch(url, options);
+    };`);
+    const backgroundPath = path.join(extensionDir, 'background.js');
+    fs.writeFileSync(backgroundPath, `importScripts('update-test-fetch.js');\n${fs.readFileSync(backgroundPath, 'utf8')}`);
     const context = await chromium.launchPersistentContext(profileDir, {
       executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined,
       headless: true, args: [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`, '--host-resolver-rules=MAP * ~NOTFOUND'],
@@ -216,6 +225,20 @@ test('market watch notifies on a matching price without purchasing', async ({ ap
   await expect(popup.locator('#marketBadge')).toHaveText('已暂停');
   await expect(popup.locator('#marketSummary')).toContainText('已保存 1 条规则');
   expect(await app.worker.evaluate(async () => chrome.alarms.get('linux-sb-market-watch'))).toBeUndefined();
+});
+
+test('popup detects a newer GitHub version and explains the local update step', async ({ app }) => {
+  await app.worker.evaluate(async () => chrome.storage.local.set({ linuxSbTestRemoteVersion: '0.12.2' }));
+  const popup = await app.context.newPage();
+  await popup.setViewportSize({ width: 360, height: 620 });
+  await popup.goto(`chrome-extension://${app.id}/popup.html`);
+  await popup.locator('#checkUpdate').click();
+  await expect(popup.locator('#updateNotice')).toBeVisible();
+  await expect(popup.locator('#updateTitle')).toContainText('0.12.2');
+  await expect(popup.locator('#updateDetail')).toContainText('替换本地扩展文件');
+  await expect(popup.locator('#reloadUpdatedFiles')).toHaveText('替换文件后重载');
+  expect(await app.worker.evaluate(async () => chrome.action.getBadgeText({}))).toBe('1');
+  await popup.screenshot({ path: path.join(root, 'docs/screenshots/update-available-popup.png'), fullPage: true });
 });
 
 test('failed forge response pauses without submitting the next stage', async ({ app }) => {

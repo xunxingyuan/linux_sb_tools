@@ -18,6 +18,15 @@
 
       <section id="status" class="status" aria-live="polite">正在读取…</section>
 
+      <section id="updateNotice" class="update-notice" aria-live="polite" hidden>
+        <strong id="updateTitle">发现新版本</strong>
+        <p id="updateDetail"></p>
+        <div class="update-actions">
+          <button id="openUpdate" type="button">查看 GitHub 更新</button>
+          <button id="reloadUpdatedFiles" type="button">替换文件后重载</button>
+        </div>
+      </section>
+
       <section class="metric-grid" aria-label="称号概况">
         <div class="metric"><span>当前积分</span><strong id="points">—</strong></div>
         <div class="metric"><span>收集进度</span><strong id="collection">—</strong></div>
@@ -48,8 +57,10 @@
         </div>
       </section>
       <div class="utility-row">
+        <button id="checkUpdate" class="text-button">检查更新</button>
         <button id="openOptions" class="text-button">更多设置</button>
       </div>
+      <div id="updateMessage" class="update-message" aria-live="polite"></div>
     </main>
     <script src="lib/state.js"></script>
     <script src="lib/parser.js"></script>

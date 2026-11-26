@@ -1,0 +1,18 @@
+.points-chart { position: relative; min-width: 0; }
+.points-chart-scroll { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.points-svg { display: block; width: 100%; overflow: visible; font-family: inherit; }
+.points-axis { fill: #94a3b8; font-size: 10px; font-variant-numeric: tabular-nums; }
+.points-bar-group:hover .points-bar-hit, .points-bar-group:focus .points-bar-hit { fill: #edf2fc; }
+.points-bar-group:focus { outline: none; }
+.points-bar-group:focus .points-bar-hit { stroke: #7698ee; stroke-width: 1; }
+.points-tooltip { margin-top: 4px; padding: 9px 12px; border-radius: 8px; background: #eff4fe; color: #35518c; font-size: 12px; }
+.points-tooltip[hidden] { display: none; }
+.points-legend { display: flex; gap: 15px; font-size: 11px; color: #64748b; }
+.points-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.points-legend i { width: 7px; height: 7px; border-radius: 2px; background: #4776ee; }
+.points-legend .expense-dot { background: #eeb05d; }
+.points-segment { display: inline-flex; padding: 3px; gap: 2px; border-radius: 8px; background: #f1f5f9; }
+.points-segment button { flex: none; border: 0; background: transparent; color: #64748b; border-radius: 6px; padding: 4px 9px; font-size: 11px; cursor: pointer; }
+.points-segment button[aria-pressed="true"] { background: #fff; color: #265ddc; box-shadow: 0 1px 4px #18366a12; font-weight: 600; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #5d89f0; outline-offset: 3px; }
+@media (prefers-reduced-motion: no-preference) { .points-bar-group rect { transition: fill .15s; } }

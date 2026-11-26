@@ -649,8 +649,15 @@
     const initial = await store.request('GET', { userId });
     const payload = { userId, generation: initial.historyGeneration, rebuild, sync: {} };
     const failures = [];
+    try {
+      const points = await globalThis.LinuxSbPointsSync.collect({ snapshot: initial, fetchPage: fetchDocument, rebuild,
+        onProgress: (page, total) => showNotice(`正在更新全部积分流水 ${page}/${total} 页…`) });
+      Object.assign(payload, points);
+    } catch (error) {
+      failures.push(`积分流水：${error.message}`);
+      payload.sync.pointsRows = { ...initial.sync.pointsRows, error: error.message };
+    }
     for (const [tab, key, parse, label] of [
-      ['points_rewards', 'historyRows', parser.parsePointsHistoryPage, '积分流水'],
       ['notifications', 'forgeEvents', parser.parseNotificationPage, '熔铸通知']
     ]) {
       try {

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>积分统计 · LINUX SB 扩展工具箱</title>
+  <link rel="stylesheet" href="points.css">
+  <link rel="stylesheet" href="points-chart.css">
+</head>
+<body>
+  <header class="app-header"><div class="header-inner">
+    <a class="brand" href="https://linux.sb/" target="_blank" rel="noopener"><span class="brand-mark">L<span>↗</span></span><span>LINUX SB <small>扩展工具箱</small></span></a>
+    <nav aria-label="工具导航"><span class="nav-active">积分统计</span><a href="https://linux.sb/gacha" target="_blank" rel="noopener">称号中心 ↗</a><a href="options.html">设置</a></nav>
+  </div></header>
+  <main class="dashboard">
+    <section class="page-heading">
+      <div><p class="eyebrow">POINTS OVERVIEW</p><h1>积分统计</h1><p class="subtitle">收支、打赏与社区互动，一屏看清积分去向。</p></div>
+      <div class="heading-actions"><label class="account-select">账号 <select id="account" aria-label="统计账号"><option value="">当前登录账号（自动识别）</option></select></label><button id="syncPoints" class="primary" type="button"><span aria-hidden="true">↻</span> 同步流水</button></div>
+    </section>
+    <p id="message" class="message" role="status" hidden></p>
+    <button id="reloadExtension" class="secondary reload-extension" type="button" hidden>重新加载扩展</button>
+    <section class="range-toolbar" aria-label="统计时间范围">
+      <div id="presets" class="preset-buttons"><button data-days="7">近 7 天</button><button data-days="30" aria-pressed="true">近 30 天</button><button data-days="90">近 90 天</button><button data-days="all">全部</button></div>
+      <form id="dateForm" class="date-range"><label><span class="sr-only">开始日期</span><input id="startDate" type="date" required></label><span>至</span><label><span class="sr-only">结束日期</span><input id="endDate" type="date" required></label><button type="submit">应用</button></form>
+    </section>
+    <section class="summary-grid" aria-label="积分概况">
+      <article class="summary-card balance-card"><span class="metric-label">当前积分余额 <i>最新快照</i></span><strong id="balance">—</strong><small id="balanceTime">尚未更新余额</small></article>
+      <article class="summary-card"><span class="metric-label"><span class="metric-icon income">↙</span> 期间获取</span><strong id="income" class="income-text">—</strong><small id="incomeCount">—</small></article>
+      <article class="summary-card"><span class="metric-label"><span class="metric-icon expense">↗</span> 期间消耗</span><strong id="expense" class="expense-text">—</strong><small id="expenseCount">—</small></article>
+      <article class="summary-card"><span class="metric-label">期间净变化</span><strong id="net">—</strong><small>获取 − 消耗</small></article>
+    </section>
+    <div class="overview-grid">
+    <section class="panel trend-panel" aria-labelledby="trendTitle">
+      <div class="panel-heading"><div><h2 id="trendTitle">积分收支趋势</h2><p id="trendRange">—</p></div><div class="trend-actions"><div class="points-legend"><span><i></i>获取</span><span><i class="expense-dot"></i>消耗</span></div><div id="chartMode" class="points-segment" aria-label="收支统计粒度"><button data-mode="day" aria-pressed="true">按天</button><button data-mode="week" aria-pressed="false">按周</button></div></div></div>
+      <div id="trendChart" class="points-chart"></div>
+      <div id="trendEmpty" class="empty-state" hidden><span aria-hidden="true">▥</span><strong>这里将呈现你的积分轨迹</strong><p>点击“同步流水”，读取所有可访问的积分记录。</p></div>
+      <div class="chart-footnote"><span>获取与消耗分别计量，不互相抵消。</span><span>北京时间 · 按周以周一开始</span></div>
+    </section>
+      <section class="panel composition-panel" aria-labelledby="compositionTitle">
+        <div class="panel-heading"><div><h2 id="compositionTitle">收支构成</h2><p>按来源大类汇总</p></div><div id="compositionMode" class="points-segment" aria-label="构成方向"><button data-direction="income" aria-pressed="true">获取</button><button data-direction="expense" aria-pressed="false">消耗</button></div></div>
+        <div class="composition-content"><div id="compositionChart"></div><div id="compositionLegend" class="composition-legend"></div></div>
+        <p class="panel-note">点击图例，查看对应来源的流水。</p>
+      </section>
+    </div>
+    <div class="people-grid">
+      <section class="panel people-panel" aria-labelledby="receivedTitle"><div class="panel-heading"><div><h2 id="receivedTitle">谁给我积分最多</h2><p id="receivedSummary">按直接打赏获取积分排行</p></div><span class="section-tag">收到打赏</span></div><div id="receivedPeople" class="rank-list"></div><button id="receivedMore" class="text-button rank-more" hidden>展开全部</button><p id="receivedNote" class="panel-note"></p></section>
+      <section class="panel people-panel" aria-labelledby="sentTitle"><div class="panel-heading"><div><h2 id="sentTitle">我给谁积分最多</h2><p id="sentSummary">按直接打赏支出积分排行</p></div><span class="section-tag amber-tag">送出打赏</span></div><div id="sentPeople" class="rank-list expense-ranks"></div><button id="sentMore" class="text-button rank-more" hidden>展开全部</button><p id="sentNote" class="panel-note"></p></section>
+    </div>
+    <div class="engagement-grid">
+      <section class="panel topic-panel" aria-labelledby="topicsTitle"><div class="panel-heading"><div><h2 id="topicsTitle">哪些主题带来更多积分</h2><p id="topicsSummary">关联主题收入排行</p></div><span class="section-tag">主题收益</span></div><div id="topicRanking" class="rank-list"></div><p class="panel-note">汇总有明确主题链接的获取记录，含直接打赏、红包及互动奖励；不计幸运打赏奖励。</p></section>
+      <section class="panel activity-panel" aria-labelledby="activityTitle"><div class="panel-heading"><div><h2 id="activityTitle">积分活跃日历</h2><p id="activityRange">每日流水笔数 · 北京时间</p></div><span class="section-tag">每日活跃</span></div><div id="activityCalendar" class="activity-calendar"></div><div class="calendar-legend"><span>少</span><i data-level="0"></i><i data-level="1"></i><i data-level="2"></i><i data-level="3"></i><i data-level="4"></i><span>多</span></div><div id="activityStats" class="activity-stats"></div></section>
+    </div>
+    <div class="breakdown-grid">
+      <section class="panel" aria-labelledby="incomeTitle"><div class="panel-heading"><div><p class="eyebrow blue">INCOME</p><h2 id="incomeTitle">积分从哪里来</h2></div><span id="incomeTypes" class="type-count">—</span></div><div id="incomeBreakdown" class="breakdown-list"></div></section>
+      <section class="panel" aria-labelledby="expenseTitle"><div class="panel-heading"><div><p class="eyebrow amber">EXPENSE</p><h2 id="expenseTitle">积分花在哪里</h2></div><span id="expenseTypes" class="type-count">—</span></div><div id="expenseBreakdown" class="breakdown-list"></div></section>
+    </div>
+    <section class="panel ledger-panel" aria-labelledby="ledgerTitle">
+      <div class="panel-heading"><div><h2 id="ledgerTitle">积分流水</h2><p id="ledgerSummary">所有类型，逐笔可查。</p></div><button id="exportCsv" class="secondary" type="button">导出明细 ↓</button></div>
+      <div class="ledger-filters"><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" aria-label="搜索流水原因" placeholder="搜索原始原因或关联主题…"></label><select id="category" aria-label="积分类型"><option value="">全部类型</option></select><select id="direction" aria-label="收支方向"><option value="">全部收支</option><option value="income">仅获取</option><option value="expense">仅消耗</option><option value="zero">无变动</option><option value="unknown">金额待识别</option></select><button id="resetFilters" class="text-button" type="button">重置筛选</button></div>
+      <div id="insightFilter" class="insight-filter" hidden><span id="insightFilterLabel"></span><button id="clearInsightFilter" type="button" class="text-button" aria-label="清除图表筛选">清除 ×</button></div>
+      <div class="table-scroll"><table><thead><tr><th scope="col">时间 <span>↓</span></th><th scope="col">类型</th><th scope="col">积分原因</th><th scope="col" class="amount-cell">变动积分</th></tr></thead><tbody id="ledgerRows"></tbody></table></div>
+      <p id="ledgerEmpty" class="ledger-empty" hidden>没有符合条件的流水。</p>
+      <div class="ledger-footer"><span id="filteredTotals">—</span><div class="pagination"><button id="previousPage" aria-label="上一页">←</button><span id="pageLabel">1 / 1</span><button id="nextPage" aria-label="下一页">→</button></div></div>
+    </section>
+    <footer class="data-footer"><div><span class="coverage-dot" id="coverageDot"></span><span id="coverage">尚未同步全部积分流水</span><p id="dataNote">统计基于论坛可访问的积分流水，不代表已被站点删除的历史。</p></div><a id="sourceLink" href="https://linux.sb/" target="_blank" rel="noopener">查看站点原始流水 ↗</a></footer>
+  </main>
+  <script src="lib/state.js"></script><script src="lib/parser.js"></script><script src="lib/history.js"></script><script src="lib/points.js"></script><script src="lib/points-sync.js"></script><script src="lib/market.js"></script><script src="lib/points-chart.js"></script><script src="lib/points-insights.js"></script><script src="points.js"></script>
+</body>
+</html>

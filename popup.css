@@ -94,6 +94,20 @@ body {
   font-size: 17px;
 }
 
+.points-preview { margin-top: 12px; padding: 10px 12px 8px; background: #fff; border: 1px solid #e5ebf5; border-radius: 10px; }
+.points-preview-header, .points-preview-footer, .points-preview-totals { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.points-preview-header strong { font-size: 13px; }
+.points-preview-link { display: block; text-decoration: none; color: inherit; border-radius: 6px; }
+.points-preview-link:hover .points-preview-footer { color: #2563eb; }
+.points-preview-totals { justify-content: flex-start; gap: 20px; margin: 8px 0 3px; color: #64748b; font-size: 10px; }
+.points-preview-totals b { margin-left: 3px; font-size: 13px; font-variant-numeric: tabular-nums; color: #3465e8; }
+.points-preview-totals span:last-child b { color: #b87a29; }
+.points-preview-footer { margin-top: 4px; font-size: 10px; color: #74849c; }
+.points-preview-footer span:last-child { color: #3465e8; }
+.points-coverage { margin: 5px 0 0; font-size: 9px; color: #94a3b8; }
+.points-empty { padding: 19px 0; margin: 0; color: #94a3b8; font-size: 11px; text-align: center; }
+.points-empty[hidden], .points-chart[hidden] { display: none; }
+
 .market-monitor {
   margin-top: 12px;
   padding: 11px 12px;

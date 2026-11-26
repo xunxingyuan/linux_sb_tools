@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "LINUX SB 扩展工具箱",
-  "version": "0.12.2",
-  "description": "LINUX SB 扩展工具箱，提供称号统计、熔铸助手和市场价格提醒。",
+  "version": "0.14.1",
+  "description": "LINUX SB 扩展工具箱，提供全类型积分收支统计、称号统计、熔铸助手和市场价格提醒。",
   "permissions": [
     "storage",
     "activeTab",
@@ -32,6 +32,7 @@
         "lib/parser.js",
         "lib/forge.js",
         "lib/history.js",
+        "lib/points-sync.js",
         "content.js"
       ],
       "css": [
@@ -48,6 +49,7 @@
         "lib/parser.js",
         "lib/forge.js",
         "lib/history.js",
+        "lib/points-sync.js",
         "content.js"
       ],
       "css": [

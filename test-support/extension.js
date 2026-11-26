@@ -54,12 +54,13 @@ function extension(initial = {}) {
           try { return { ok: true, result: await request(message.action, message, tabId) }; }
           catch (error) { return { ok: false, error: error.message }; }
         },
-        onMessage: { addListener() {} }, openOptionsPage() {}, reload() { instance.window.__reloadCount = (instance.window.__reloadCount || 0) + 1; }
+        onMessage: { addListener() {} }, openOptionsPage() {}, getURL: path => `https://extension.test/${path}`, reload() { instance.window.__reloadCount = (instance.window.__reloadCount || 0) + 1; }
       },
-      tabs: { query: async () => [{ id: tabId }], create() {} }
+      tabs: { query: async () => [{ id: tabId }], create(options) { (instance.window.__createdTabs ||= []).push(options); } }
     };
     instance.window.chrome = chrome;
     instance.window.AbortSignal = global.AbortSignal;
+    instance.window.AbortController = global.AbortController;
     const evaluate = file => instance.window.eval(source(file));
     return { window: instance.window, document: instance.window.document, evaluate, close: () => instance.window.close() };
   }

@@ -20,7 +20,7 @@ const test = base.extend({
     const extensionDir = fs.mkdtempSync(path.join(os.tmpdir(), 'card-extension-'));
     fs.cpSync(root, extensionDir, { recursive: true, filter: source => {
       const top = path.relative(root, source).split(path.sep)[0];
-      return !['.git', 'node_modules', 'browser-tests', 'tests', 'test-results', 'docs'].includes(top) && !source.endsWith('.zip');
+      return !['.git', 'node_modules', 'browser-tests', 'tests', 'test-results', 'docs', 'output', '.playwright-mcp'].includes(top) && !source.endsWith('.zip');
     } });
     const marketHtml = `<div class="bar-right"><a href="/user/1">我的账号</a></div>
       <form class="gacha-market-filters"></form><div class="gacha-market-grid">
@@ -308,5 +308,160 @@ test('draw from a clean installation checks balance independently of inventory a
   await panel.getByRole('button', { name: '确认抽取', exact: true }).click();
   await expect(panel.getByRole('alert')).toContainText('积分不足');
   expect(submitted).toEqual([]);
+  expect(app.errors).toEqual([]);
+});
+
+const pointsApi = require('../lib/points');
+function pointsDemoRows() {
+  const today = pointsApi.dayKey(new Date());
+  const rows = [];
+  for (let day = 0; day < 30; day++) {
+    const date = pointsApi.addDays(today, -day);
+    for (const [index, [reason, change]] of [
+      ['每日签到', 20], ['浏览广告奖励', 350 + (day * 397) % 2100],
+      ['领取红包', 50 + (day * 761) % 2900], [`用户「${['林间风', '小蓝', '河流', '木子', '云雀', '星光', '阿新', '北屿', '小满'][day % 9]}」打赏了你的主题`, (day * 233) % 720],
+      ['抽卡:称号系统', -(day % 5 === 0 ? 2400 : 90)],
+      ['购买称号', -(day % 4 === 0 ? 1300 : 0)], [`给用户「${['木子', '北屿', '小蓝', '林间风'][day % 4]}」的主题打赏`, -(day * 37) % 300],
+      ['未知新活动奖励', day % 6 === 0 ? 100 : 0]
+    ].entries()) {
+      if (change) rows.push({ id: `p-${day}-${index}`, reason, change, time: `${date} ${String(9 + index).padStart(2, '0')}:30:00`,
+        ...([2, 3, 6].includes(index) ? { relatedUrl: `https://linux.sb/topic/${50 + day % 6}?replyid=${day * 10 + index}`,
+          relatedTitle: ['浏览器插件的日常折腾', '一份实用的社区工具清单', '聊聊最近在用的 AI 工具', '积分使用心得与避坑记录', '开源项目进度周报', '提高效率的小技巧'][day % 6] } : {}) });
+    }
+  }
+  rows.push(
+    { id: 'lucky-mixed', reason: '幸运打赏奖励', change: 4356, time: `${today} 17:30:00`, relatedTitle: '浏览器插件的日常折腾', relatedUrl: 'https://linux.sb/topic/50' },
+    { id: 'lucky-only', reason: '幸运打赏奖励', change: 4554, time: `${today} 18:30:00`, relatedTitle: '仅有幸运打赏的主题', relatedUrl: 'https://linux.sb/topic/999' }
+  );
+  return rows;
+}
+
+test('points popup and dashboard show all-type daily/weekly charts, filters and responsive layouts', async ({ app }) => {
+  const rows = pointsDemoRows();
+  await app.worker.evaluate(async ({ key, rows }) => {
+    const state = globalThis.LinuxSbState;
+    const root = state.normalize(); root.activeUserId = '1';
+    root.accounts['1'] = { ...state.emptyAccount(), current: { ...state.emptyAccount().current, points: 186574, ownedTypes: 20, totalTypes: 23 },
+      updatedAt: new Date().toISOString(), pointsRows: rows,
+      historyRows: rows.filter(row => /抽卡/.test(row.reason)).map(row => ({ ...row, kind: 'draw', mode: 'single', pulls: 1 })),
+      sync: { pointsRows: { complete: true, updatedAt: new Date().toISOString() } } };
+    await chrome.storage.local.set({ [key]: root,
+      linuxSbMarketWatchConfig: { enabled: false, intervalMinutes: 5, rules: [{ id: 'one', title: '反贼', maxPrice: 5000 }] } });
+  }, { key: titleStateKey, rows });
+  const popup = await app.context.newPage();
+  await popup.setViewportSize({ width: 360, height: 850 });
+  await popup.goto(`chrome-extension://${app.id}/popup.html`);
+  await expect(popup.locator('#pointsChart .points-bar-group')).toHaveCount(7);
+  await popup.getByRole('button', { name: '按周', exact: true }).click();
+  await expect(popup.locator('#pointsChart .points-bar-group')).toHaveCount(8);
+  await expect(popup.locator('#marketRules')).toContainText('反贼');
+  await popup.screenshot({ path: path.join(root, 'docs/screenshots/points-popup.png'), fullPage: true });
+  const newPage = app.context.waitForEvent('page');
+  await popup.locator('#openPoints').click();
+  const dashboard = await newPage;
+  await dashboard.waitForURL(/points.html\?mode=week&account=1/);
+  await dashboard.setViewportSize({ width: 1280, height: 950 });
+  await expect(dashboard.locator('#balance')).toHaveText('186,574');
+  await dashboard.getByRole('button', { name: '近 30 天', exact: true }).click();
+  await dashboard.getByRole('button', { name: '按天', exact: true }).click();
+  await expect(dashboard.locator('#trendChart .points-bar-group')).toHaveCount(30);
+  const total = pointsApi.summary(pointsApi.records(rows));
+  await expect(dashboard.locator('#income')).toHaveText(pointsApi.format(total.income));
+  await expect(dashboard.locator('#expense')).toHaveText(pointsApi.format(total.expense));
+  await expect(dashboard.locator('#trendChart svg')).toHaveCSS('height', '212px');
+  await expect(dashboard.locator('#sourceTitle')).toHaveCount(0);
+  await expect(dashboard.locator('#receivedPeople .person-row')).toHaveCount(6);
+  await expect(dashboard.locator('#sentPeople .person-row')).toHaveCount(4);
+  await expect(dashboard.locator('#topicsSummary')).toContainText('6 个关联主题');
+  await expect(dashboard.locator('#topicRanking')).not.toContainText('仅有幸运打赏的主题');
+  await dashboard.screenshot({ path: path.join(root, 'docs/screenshots/points-dashboard.png'), fullPage: true });
+  await dashboard.getByRole('button', { name: '查看来自林间风的打赏流水', exact: true }).click();
+  await expect(dashboard.locator('#ledgerRows tr')).toHaveCount(3);
+  await expect(dashboard.locator('#filteredTotals')).toContainText('获取 1,782');
+  await dashboard.locator('#clearInsightFilter').click();
+  await dashboard.getByRole('button', { name: '查看送给木子的打赏流水', exact: true }).click();
+  await expect(dashboard.locator('#ledgerRows tr')).toHaveCount(7);
+  await expect(dashboard.locator('#filteredTotals')).toContainText('消耗 1,444');
+  await dashboard.locator('#resetFilters').click();
+  await dashboard.getByRole('button', { name: '查看主题 浏览器插件的日常折腾 的积分流水', exact: true }).click();
+  await expect(dashboard.locator('#ledgerRows tr')).toHaveCount(9);
+  await expect(dashboard.locator('#ledgerRows')).not.toContainText('幸运打赏奖励');
+  await dashboard.locator('#resetFilters').click();
+  await dashboard.locator(`#activityCalendar [data-day="${pointsApi.dayKey(new Date())}"]`).click();
+  await expect(dashboard.locator('#ledgerRows tr')).toHaveCount(8);
+  await dashboard.locator('#resetFilters').click();
+  await dashboard.locator('#compositionMode [data-direction="expense"]').click();
+  await dashboard.locator('#compositionLegend button').filter({ hasText: '称号交易' }).click();
+  await expect(dashboard.locator('#ledgerRows tr')).toHaveCount(8);
+  await dashboard.locator('#resetFilters').click();
+  await dashboard.locator('#compositionMode [data-direction="income"]').click();
+  await dashboard.setViewportSize({ width: 2560, height: 1440 });
+  await expect(dashboard.locator('#trendChart svg')).toHaveCSS('height', '212px');
+  await expect(dashboard.locator('#trendChart').evaluate(node => node.getBoundingClientRect().height < 240)).resolves.toBe(true);
+  await dashboard.locator('#search').fill('未知新活动');
+  await expect(dashboard.locator('#ledgerRows tr')).toHaveCount(5);
+  await expect(dashboard.locator('#ledgerRows')).toContainText('待分类');
+  await expect(dashboard.locator('#sourceTitle')).toHaveCount(0);
+  await dashboard.locator('#resetFilters').click();
+  await dashboard.getByRole('button', { name: '筛选称号购买消耗明细', exact: true }).click();
+  await expect(dashboard.locator('#category')).toHaveValue('称号购买');
+  await expect(dashboard.locator('#ledgerRows tr')).toHaveCount(8);
+  await dashboard.locator('#resetFilters').click();
+  await dashboard.setViewportSize({ width: 390, height: 844 });
+  await dashboard.evaluate(() => window.scrollTo(0, 0));
+  await expect(dashboard.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).resolves.toBe(true);
+  await dashboard.screenshot({ path: path.join(root, 'docs/screenshots/points-dashboard-mobile.png'), fullPage: true });
+  expect(app.errors).toEqual([]);
+});
+
+test('points page syncs all pages for old title-only data; incremental refresh, failure and account switch preserve history', async ({ app }) => {
+  const today = pointsApi.dayKey(new Date());
+  const rows = [
+    { id: 'old', reason: '抽卡:称号系统', change: '-10', time: `${today} 11:00:00` },
+    { id: 'new', reason: '每日签到', change: '+20', time: `${today} 10:00:00` }
+  ];
+  await app.worker.evaluate(async key => {
+    const api = globalThis.LinuxSbState, root = api.normalize(); root.activeUserId = '1';
+    root.accounts['1'] = { current: { points: 903 }, historyGeneration: 0, historyRows: [{ id: 'old', reason: '抽卡:称号系统', change: -10 }], forgeEvents: [], sync: { historyRows: { complete: true } } };
+    await chrome.storage.local.set({ [key]: root });
+  }, titleStateKey);
+  const visited = [];
+  let wrongAccount = false, failSecond = false;
+  await app.context.route('https://linux.sb/user/1?tab=points_rewards*', async route => {
+    const p = Number(new URL(route.request().url()).searchParams.get('p')); visited.push(p);
+    if (failSecond && p === 2) return route.fulfill({ status: 503, body: 'Offline' });
+    const row = rows[Math.min(p - 1, 1)];
+    const html = `${accountBar(wrongAccount ? '2' : '1')}<main><article class="points-rewards-detail" data-id="${row.id}"><span class="points-rewards-reason">${row.reason}</span><span class="points-rewards-change-value">${row.change}</span><time class="points-rewards-time" datetime="${row.time}"></time></article><a href="/user/1?tab=points_rewards&p=2">2</a></main>`;
+    return route.fulfill({ contentType: 'text/html', body: html });
+  });
+  await app.page.goto(`chrome-extension://${app.id}/points.html?account=1`);
+  await app.page.locator('#syncPoints').click();
+  await expect(app.page.locator('#message')).toContainText('同步完成');
+  expect(visited).toEqual([1, 2]);
+  await expect(app.page.locator('#income')).toHaveText('20');
+  visited.length = 0;
+  await app.page.locator('#syncPoints').click();
+  await expect(app.page.locator('#message')).toContainText('同步完成');
+  expect(visited).toEqual([1]);
+  wrongAccount = true;
+  await app.page.locator('#syncPoints').click();
+  await expect(app.page.locator('#message')).toContainText('与统计账号 1 不同');
+  await expect(app.page.locator('#ledgerRows tr')).toHaveCount(2);
+  wrongAccount = false; failSecond = true;
+  await app.worker.evaluate(async key => { const data = await chrome.storage.local.get(key); data[key].accounts['1'].sync.pointsRows.complete = false; await chrome.storage.local.set(data); }, titleStateKey);
+  await expect(app.page.locator('#coverage')).toContainText('历史尚未完整');
+  await app.page.locator('#syncPoints').click();
+  await expect(app.page.locator('#message')).toContainText('503');
+  await expect(app.page.locator('#ledgerRows tr')).toHaveCount(2);
+  await app.context.route('https://linux.sb/gacha', route => route.fulfill({ contentType: 'text/html', body: gacha('2', 222) }));
+  await app.context.route('https://linux.sb/user/2?tab=points_rewards*', route => route.fulfill({ contentType: 'text/html', body: `${accountBar('2')}<main><p>暂无记录</p></main>` }));
+  await app.page.locator('#account').selectOption('');
+  await expect(app.page.locator('#account')).toHaveValue('');
+  await app.page.locator('#syncPoints').click();
+  await expect(app.page.locator('#message')).toContainText('同步完成');
+  await expect(app.page.locator('#balance')).toHaveText('222');
+  await expect(app.page.locator('#account option[value="2"]')).toHaveCount(1);
+  await app.page.locator('#account').selectOption('1');
+  await expect(app.page.locator('#ledgerRows tr')).toHaveCount(2);
   expect(app.errors).toEqual([]);
 });

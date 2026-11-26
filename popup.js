@@ -4,6 +4,25 @@
   const $ = id => document.getElementById(id);
   const formatNumber = value => value !== null && value !== undefined && Number.isFinite(Number(value)) ? Number(value).toLocaleString('zh-CN') : '—';
   const REPOSITORY_URL = 'https://github.com/xunxingyuan/linux_sb_tools';
+  let currentState = null;
+  let pointsMode = 'day';
+  function renderPoints() {
+    if (!currentState) return;
+    const api = globalThis.LinuxSbPoints;
+    const rows = api.records(currentState.pointsRows);
+    const range = api.recentRange(pointsMode);
+    const totals = api.summary(api.inRange(rows, range.start, range.end));
+    const complete = currentState.sync.pointsRows?.complete === true;
+    $('pointsIncome').textContent = api.format(totals.income);
+    $('pointsExpense').textContent = api.format(totals.expense);
+    $('pointsRange').textContent = pointsMode === 'day' ? '近 7 天' : '近 8 周 · 周一开始';
+    $('pointsEmpty').hidden = rows.length > 0;
+    $('pointsChart').hidden = !rows.length;
+    globalThis.LinuxSbPointsChart.render($('pointsChart'), api.buckets(rows, { ...range, mode: pointsMode }), { compact: true, mode: pointsMode });
+    $('pointsCoverage').textContent = currentState.sync.pointsRows?.error ? '同步异常 · 点击查看详情'
+      : complete ? '基于已同步流水 · 北京时间' : '需首次同步全类型流水';
+    $('openPoints').href = `points.html?mode=${pointsMode}${currentState.userId ? `&account=${currentState.userId}` : ''}`;
+  }
   function renderUpdate(status, manual = false) {
     $('updateNotice').hidden = !status.available;
     if (status.available) {
@@ -64,6 +83,7 @@
     $('status').classList.toggle('error', error);
   }
   function render(state) {
+    currentState = state;
     const current = state.current;
     const summary = globalThis.LinuxSbTitleStats.summarizeHistory(state.historyRows);
     $('points').textContent = formatNumber(current.points);
@@ -74,6 +94,7 @@
       ? new Date(state.updatedAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
       : '';
     setStatus(updated ? `账号 ${state.userId} · ${updated} 更新` : '打开称号页以同步');
+    renderPoints();
   }
   async function refresh() {
     $('refresh').disabled = true;
@@ -90,6 +111,18 @@
     } finally { $('refresh').disabled = false; }
   }
   $('refresh').addEventListener('click', refresh);
+  $('pointsPeriod').addEventListener('click', event => {
+    const mode = event.target.closest('button')?.dataset.mode;
+    if (!mode) return;
+    pointsMode = mode;
+    for (const button of $('pointsPeriod').querySelectorAll('button')) button.setAttribute('aria-pressed', String(button.dataset.mode === mode));
+    renderPoints();
+  });
+  $('openPoints').addEventListener('click', event => {
+    event.preventDefault();
+    chrome.tabs.create({ url: chrome.runtime.getURL($('openPoints').getAttribute('href')) });
+    window.close();
+  });
   for (const [id, path] of [['openGacha', '/gacha'], ['openProfile', '/gacha_profile'], ['openForge', '/gacha_forge_center'], ['openMarket', '/gacha_market']]) {
     $(id).addEventListener('click', () => { chrome.tabs.create({ url: `https://linux.sb${path}` }); window.close(); });
   }
@@ -106,6 +139,9 @@
     finally { button.disabled = false; }
   });
   chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes[store.STORAGE_KEY]) {
+      store.request('GET').then(render).catch(error => setStatus(error.message, true));
+    }
     if (area === 'local' && (changes.linuxSbMarketWatchConfig || changes.linuxSbMarketWatchRuntime)) {
       loadMarket().catch(() => { $('marketSummary').textContent = '读取监控状态失败'; });
     }

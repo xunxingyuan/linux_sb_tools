@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LINUX SB 扩展工具箱</title>
     <link rel="stylesheet" href="popup.css">
+    <link rel="stylesheet" href="points-chart.css">
   </head>
   <body>
     <main class="popup">
       <header class="popup-header">
         <div>
           <div class="popup-title">🧰 LINUX SB 扩展工具箱</div>
-          <div class="popup-subtitle">称号统计 · 熔铸助手 · 市场提醒</div>
+          <div class="popup-subtitle">积分统计 · 称号助手 · 市场提醒</div>
         </div>
         <span class="local-badge">本地</span>
       </header>
@@ -32,6 +33,23 @@
         <div class="metric"><span>收集进度</span><strong id="collection">—</strong></div>
         <div class="metric"><span>累计抽取</span><strong id="pulls">—</strong></div>
         <div class="metric"><span>累计投入</span><strong id="spend">—</strong></div>
+      </section>
+
+      <section class="points-preview" aria-labelledby="pointsPreviewTitle">
+        <div class="points-preview-header">
+          <strong id="pointsPreviewTitle">积分收支</strong>
+          <div id="pointsPeriod" class="points-segment" aria-label="积分统计粒度">
+            <button type="button" data-mode="day" aria-pressed="true">按天</button>
+            <button type="button" data-mode="week" aria-pressed="false">按周</button>
+          </div>
+        </div>
+        <a id="openPoints" class="points-preview-link" href="points.html" aria-label="查看完整积分统计">
+          <div class="points-preview-totals"><span>获取 <b id="pointsIncome">—</b></span><span>消耗 <b id="pointsExpense">—</b></span></div>
+          <div id="pointsChart" class="points-chart"></div>
+          <p id="pointsEmpty" class="points-empty" hidden>同步全部积分流水，查看收支趋势</p>
+          <div class="points-preview-footer"><span id="pointsRange">近 7 天</span><span>全部统计 <span aria-hidden="true">↗</span></span></div>
+        </a>
+        <p id="pointsCoverage" class="points-coverage"></p>
       </section>
 
       <section class="market-monitor" aria-labelledby="marketMonitorTitle">
@@ -64,6 +82,8 @@
     </main>
     <script src="lib/state.js"></script>
     <script src="lib/parser.js"></script>
+    <script src="lib/points.js"></script>
+    <script src="lib/points-chart.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

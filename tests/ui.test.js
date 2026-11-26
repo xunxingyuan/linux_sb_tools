@@ -5,7 +5,7 @@ const state = require('../lib/state');
 const market = require('../lib/market');
 const currentVersion = require('../manifest.json').version;
 const key = state.STORAGE_KEY;
-const scripts = ['lib/state.js', 'lib/parser.js', 'lib/forge.js', 'lib/history.js', 'content.js'];
+const scripts = ['lib/state.js', 'lib/parser.js', 'lib/forge.js', 'lib/history.js', 'lib/points-sync.js', 'content.js'];
 async function pageFor(ext, html, path = '/gacha', fetcher) {
   const dom = ext.dom(html, 'https://linux.sb' + path);
   dom.window.fetch = fetcher || (async url => ({ ok: true, text: async () => String(url).includes('gacha_profile') ? profile() : gacha() }));
@@ -18,7 +18,7 @@ test('popup shows title actions without retired controls', async t => {
   const ext = extension({ [key]: { userId: '1', settings: { adRemovalEnabled: true, reservePoints: 100, forgeTarget: 'SSR', forgeKeepOne: false } } });
   const dom = ext.dom(source('popup.html'), 'https://extension.test/popup.html');
   t.after(dom.close);
-  ['lib/state.js', 'lib/parser.js', 'popup.js'].forEach(dom.evaluate);
+  ['lib/state.js', 'lib/parser.js', 'lib/points.js', 'lib/points-chart.js', 'popup.js'].forEach(dom.evaluate);
   await tick();
   assert.equal(dom.document.getElementById('adRemovalEnabled'), null);
   assert.equal(dom.document.getElementById('reserve'), null);
@@ -40,7 +40,7 @@ test('popup shows monitored titles, prices, recent matches and errors', async t 
   const ext = extension({ [market.CONFIG_KEY]: config, [market.RUNTIME_KEY]: runtime });
   const dom = ext.dom(source('popup.html'), 'https://extension.test/popup.html');
   t.after(dom.close);
-  ['lib/state.js', 'lib/parser.js', 'popup.js'].forEach(dom.evaluate);
+  ['lib/state.js', 'lib/parser.js', 'lib/points.js', 'lib/points-chart.js', 'popup.js'].forEach(dom.evaluate);
   await tick();
   const $ = id => dom.document.getElementById(id);
   assert.equal($('marketBadge').textContent, '监控中');
@@ -58,7 +58,7 @@ test('popup offers reload only after showing the local file replacement step', a
   const ext = extension({ linuxSbUpdateStatus: { localVersion: currentVersion, remoteVersion: newerVersion, available: true, error: '' } });
   const dom = ext.dom(source('popup.html'), 'https://extension.test/popup.html');
   t.after(dom.close);
-  ['lib/state.js', 'lib/parser.js', 'popup.js'].forEach(dom.evaluate);
+  ['lib/state.js', 'lib/parser.js', 'lib/points.js', 'lib/points-chart.js', 'popup.js'].forEach(dom.evaluate);
   await tick();
   assert.match(dom.document.getElementById('updateDetail').textContent, /先从 GitHub 获取新版并替换本地扩展文件/);
   dom.document.getElementById('reloadUpdatedFiles').click();
